@@ -159,6 +159,16 @@ const ROOM_SYSTEM =
 
 export interface RoomTurn { speaker: string; text: string; }
 
+// Some models/routes ignore the `reasoning: { enabled: false }` opt-out above and
+// emit their chain-of-thought inline as a <think>...</think> (or <reasoning>/<thinking>)
+// block ahead of the real reply, which otherwise renders straight into the chat as
+// visible junk. Strip it generically here — every completion path funnels through
+// this — rather than per-agent, since any seat's model could start doing this.
+const THINK_TAG_STRIP = /<(think|thinking|reasoning)>[\s\S]*?<\/\1>/gi;
+function stripReasoning(text: string): string {
+  return text.replace(THINK_TAG_STRIP, "").trim();
+}
+
 // Generic OpenAI-compatible chat completion — works for OpenRouter, z.ai, Sakana,
 // a local LM Studio/vLLM server, etc. (anything that speaks /chat/completions).
 async function openaiChat(baseUrl: string, model: string, sys: string, user: string, key: string, signal?: AbortSignal, opts?: { noReasoning?: boolean }): Promise<string> {
@@ -176,14 +186,14 @@ async function openaiChat(baseUrl: string, model: string, sys: string, user: str
   let r = await call(false);
   let j = await r.json();
   if (!r.ok || !j?.choices?.[0]) throw new Error(j?.error?.message || `HTTP ${r.status}`);
-  let out = String(j.choices[0].message?.content ?? "").trim();
+  let out = stripReasoning(String(j.choices[0].message?.content ?? "").trim());
   // Empty visible content usually means reasoning ate the whole budget — retry
   // once with hidden CoT forced off so the agent still answers instead of "…".
   if (!out && !signal?.aborted) {
     r = await call(true);
     j = await r.json();
     if (!r.ok || !j?.choices?.[0]) throw new Error(j?.error?.message || `HTTP ${r.status}`);
-    out = String(j.choices[0].message?.content ?? "").trim();
+    out = stripReasoning(String(j.choices[0].message?.content ?? "").trim());
   }
   return out;
 }
@@ -198,7 +208,7 @@ async function ollamaComplete(model: string, sys: string, user: string, signal?:
   });
   if (!r.ok) throw new Error(`Ollama ${r.status} — is it running?`);
   const j = await r.json();
-  return String(j?.message?.content ?? "").trim();
+  return stripReasoning(String(j?.message?.content ?? "").trim());
 }
 
 export interface RoomSource { kind: "profile" | "note" | "memory"; title: string; }
