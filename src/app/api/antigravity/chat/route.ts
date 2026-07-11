@@ -48,7 +48,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "prompt too long" }, { status: 413 });
   }
 
-  const args: string[] = ["-p", buildPromptWithHistory(history, prompt)];
+  // Gemini CLI (formerly "agy") needs -y/--yolo in headless mode — without it the
+  // process blocks on an interactive approval prompt it can't display in oneshot mode.
+  const args: string[] = ["-p", buildPromptWithHistory(history, prompt), "-y", "--skip-trust"];
   if (dangerouslySkipPermissions === true) args.push("--dangerously-skip-permissions");
 
   const out = await run("antigravity", args, { timeoutMs: TIMEOUT_MS });

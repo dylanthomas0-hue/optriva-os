@@ -204,11 +204,9 @@ export default function UnifiedChat({
     setPartial("");
     const ctrl = new AbortController();
     ctrlRef.current = ctrl;
-    // Give the network/proxy 6.5 min — slightly longer than the server-side 6 min hermes timeout
-    // so the server gets to send back its own diagnostic message rather than us aborting first.
-    const watchdog = setTimeout(() => ctrl.abort(), 6.5 * 60 * 1000);
-    // Send the prior turns so Hermes keeps conversation context (hermes -z is single-shot
-    // per call, so without this every message was treated as a brand-new conversation).
+    // Watchdog at 100s — slightly longer than the server-side 90s timeout so the
+    // server gets to send back its own diagnostic message rather than us aborting first.
+    const watchdog = setTimeout(() => ctrl.abort(), 100 * 1000);
     const history = msgs.slice(-24).map((m) => ({ role: m.role, text: m.text }));
     try {
       const r = await fetch("/api/hermes/chat", {
@@ -218,7 +216,18 @@ export default function UnifiedChat({
         signal: ctrl.signal,
       });
       const j = await r.json();
-      return j.text ?? "(no response — empty body)";
+      if (j.empty && j.timedOut) {
+        return `Hermes didn't respond in time (${Math.round(j.durationMs/1000)}s timed out). ${j.text || "Check hermes status to see if your provider is reachable."}`;
+      }
+      if (j.empty) {
+        return j.text || "Hermes returned no output. Run hermes status to check provider config.";
+      }
+      return j.text ?? "(no response)";
+    } catch (e: any) {
+      if (e.name === "AbortError") {
+        return "Request was cancelled or timed out. Hermes may be starting up — try again in a moment.";
+      }
+      return `Hermes is not reachable (${e.message || "network error"}). Is the hermes-gateway running?`;
     } finally {
       clearTimeout(watchdog);
     }
@@ -521,9 +530,9 @@ export default function UnifiedChat({
                         </span>
                       )}
                     </span>
-                    {agent !== "claude" && elapsedMs > 30_000 && (
+                    {agent !== "claude" && elapsedMs > 45_000 && (
                       <span className="text-[11px] text-amber-300/80 ml-1">
-                        (taking longer than usual — normally under 10s)
+                        (agentic task — running tools, searching, or reading files)
                       </span>
                     )}
                   </span>
@@ -592,7 +601,7 @@ export default function UnifiedChat({
           {agent !== "claude" && (
             <span className="text-amber-400/80">
               {agent === "hermes"
-                ? "hermes: 5–15s (Nous Portal)"
+                ? "hermes: 3–10s simple · 30–90s with tools (OpenRouter gemini-2.5-flash)"
                 : agent === "antigravity"
                 ? "antigravity: 10–90s (Gemini CLI's successor, multi-agent harness)"
                 : "openclaw: 20–40s (ollama/deepseek-v4-flash) — keep waiting"}

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { run } from "@/lib/runner";
 import { hermesHome } from "@/lib/config";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 export const runtime = "nodejs";
@@ -11,7 +11,29 @@ export const dynamic = "force-dynamic";
 // Otherwise terminal control codes can eat the reply or leave it looking empty.
 const ANSI_STRIP = /\x1b\[[0-9;?]*[a-zA-Z]|\x1b\]\d+;[^\x07\x1b]*(\x07|\x1b\\)/g;
 
-const TIMEOUT_MS = 6 * 60 * 1000; // 6 min — multi-step agentic tasks (skill invocations, video edits) routinely exceed 2 min.
+const TIMEOUT_MS = 90 * 1000; // 90s — gemini-2.5-flash on OpenRouter replies in 3–7s; 90s is plenty for multi-tool runs while failing fast on broken configs.
+
+// ── Vault Instant Memory — Hermes always knows who Dylan is and what's happening ──
+// Reads the same auto-loaded context files the Agent Room uses (Omi/Memories.md +
+// About Me.md) so Hermes never has to read a file to learn basic facts. Cached in
+// memory after first read — refreshes on restart.
+let _vaultContext = "";
+function vaultContext(): string {
+  if (_vaultContext) return _vaultContext;
+  const vaultRoot = "/Users/dylanthomas/Documents/Obsidian Vault";
+  const parts: string[] = [];
+  try {
+    const omi = readFileSync(path.join(vaultRoot, "Omi", "Memories.md"), "utf8");
+    parts.push("WHO DYLAN IS + WHAT'S HAPPENING (instant vault memory):\n" + omi.slice(0, 3000));
+  } catch {}
+  try {
+    const about = readFileSync(path.join(vaultRoot, "About Me.md"), "utf8");
+    const clean = about.replace(/^---[\s\S]*?---/, "").replace(/[#*>[\]]/g, "").replace(/\n{2,}/g, "\n").trim().slice(0, 800);
+    if (clean) parts.push("ABOUT DYLAN:\n" + clean);
+  } catch {}
+  _vaultContext = parts.join("\n\n");
+  return _vaultContext;
+}
 
 interface ChatMsg { role: "user" | "assistant" | "system"; text: string; }
 
@@ -72,8 +94,26 @@ export async function POST(req: Request) {
     ? ["--profile", profile]
     : [];
   // Pack the recent conversation in so follow-ups keep context (no more amnesia).
-  const fullPrompt = buildPromptWithHistory(history, prompt);
-  const out = await run("hermes", [...profileArgs, "-z", fullPrompt, "--yolo", "--accept-hooks"], { timeoutMs: TIMEOUT_MS });
+  // Also prepend instant vault memory so Hermes always knows who Dylan is and what
+  // he's working on — no file reads needed for basic context.
+  const ctx = vaultContext();
+  // Hermes keeps trying to hit localhost HTTP APIs for cron/kanban actions and
+  // gets blocked by its own SSRF protection. It already has the terminal tool
+  // (-t all) — steer it to the CLI, which works in oneshot mode.
+  const capabilities = [
+    "--- HOW TO DO THINGS (capabilities) ---",
+    "Cron jobs: use your terminal tool with the hermes CLI — NEVER call localhost/127.0.0.1 HTTP APIs (SSRF protection blocks them and it will fail).",
+    "  • Run a job now:  hermes cron run <job-id> --accept-hooks",
+    "  • List jobs:      hermes cron list",
+    "After triggering a job, tell the user it's running; output lands in ~/.hermes/cron/output/<job-id>/.",
+    "--- end capabilities ---",
+  ].join("\n");
+  const fullPrompt = ctx
+    ? `--- INSTANT VAULT MEMORY (you know this, don't read any file for it) ---\n${ctx}\n--- end vault memory ---\n\n${capabilities}\n\n${buildPromptWithHistory(history, prompt)}`
+    : `${capabilities}\n\n${buildPromptWithHistory(history, prompt)}`;
+  // -t all gives Hermes every tool (cron, kanban, file, web, terminal, browser, etc.)
+  // Without it, oneshot mode loads a limited subset and can't manage crons or kanban.
+  const out = await run("hermes", [...profileArgs, "-z", fullPrompt, "-t", "all", "--yolo", "--accept-hooks"], { timeoutMs: TIMEOUT_MS });
 
   const text = out.stdout.replace(ANSI_STRIP, "").trim();
   const stderrClean = out.stderr.replace(ANSI_STRIP, "").trim();
@@ -85,16 +125,25 @@ export async function POST(req: Request) {
     const probableTimeout = out.durationMs >= TIMEOUT_MS - 2_000;
     const lines: string[] = [];
     lines.push(probableTimeout
-      ? `⏱ Hermes was killed after ${seconds}s — the task likely needed longer than the ${Math.round(TIMEOUT_MS/60000)}-minute budget. Multi-step agentic tasks (skill invocations, video edits) often exceed this.`
-      : `⚠ Hermes finished in ${seconds}s with exit ${out.code} but no stdout.`
-    );
+      ? `Hermes timed out after ${seconds}s. Your provider (${process.env.OPENROUTER_API_KEY ? "OpenRouter" : "custom"}) may be slow or unreachable. Try: hermes status`
+      : `Hermes finished in ${seconds}s with exit ${out.code} but no response.`);
     if (stderrClean) {
+      // Surface the most actionable line first — common errors have known fixes.
+      const known: Record<string, string> = {
+        "No models provided": "Hermes couldn't find a valid model. Check ~/.hermes/config.yaml → model & provider. Run hermes status.",
+        "401": "API key rejected. Run hermes login or check ~/.hermes/.env for your OPENROUTER_API_KEY.",
+        "400": "Bad request — likely a model/provider mismatch. Run hermes status to see what model is configured.",
+        "timeout": "The model took too long to respond. Your provider may be overloaded or the model is too slow for agent use.",
+      };
+      for (const [key, fix] of Object.entries(known)) {
+        if (stderrClean.toLowerCase().includes(key.toLowerCase())) { lines.push(`Fix: ${fix}`); break; }
+      }
       lines.push("");
       lines.push("─── stderr ───");
       lines.push(stderrClean.length > 4000 ? stderrClean.slice(-4000) : stderrClean);
     } else {
       lines.push("");
-      lines.push("(no stderr either) — blank output with no error is almost always auth or provider config:");
+      lines.push("Blank output with no error is almost always auth or provider config:");
       lines.push("  1. Run `hermes status` — does your provider show a ✓ next to its API key?");
       lines.push("  2. If ✗, run `hermes login` (or set the key in ~/.hermes/.env) for that provider.");
       lines.push("  3. Check the Model + Provider lines in `hermes status` are a real, supported combo.");
