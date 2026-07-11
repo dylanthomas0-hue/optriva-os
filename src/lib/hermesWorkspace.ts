@@ -52,18 +52,6 @@ export interface BucketDef {
 
 const BUCKETS: BucketDef[] = [
   {
-    id: "kimi",
-    label: "Kimi K2.7 ✦",
-    // Builds made with the Kimi K2.7 profile (Moonshot Kimi K2.7 Code via the
-    // coding plan): playable HTML apps/games AND finished video renders that land
-    // at the workspace root. depth 0 so it shows ONLY the actual deliverables —
-    // no intermediate render frames / assets that pile up in sub-folders.
-    paths: [path.join(HERMES_ROOT, "profiles", "kimi-k2-7", "workspace")],
-    description: "Apps, games + videos built with Kimi K2.7 Code (your coding plan). Click any → plays/renders live.",
-    extsAllow: [".html", ".htm", ".mp4", ".webm", ".mov", ".m4v"],
-    maxDepth: 0,
-  },
-  {
     id: "glm",
     label: "GLM 5.2 ✦",
     // Builds made with the GLM-5.2 profile (Zhipu / z.ai GLM Coding Plan — flagship

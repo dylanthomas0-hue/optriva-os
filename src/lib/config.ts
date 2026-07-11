@@ -20,7 +20,6 @@ export interface AgenticConfig {
   hermes: string | null;
   antigravity: string | null;
   codex: string | null;
-  kimi: string | null; // Kimi Code CLI (Kimi K2.7) — installs to ~/.kimi-code/bin
   grok: string | null; // Grok Build CLI (xAI grok-build-0.1) — installs to ~/.grok/bin
   ruflo: string | null;
   ant: string | null; // Claude Platform CLI (`ant`) — note: collides with Apache Ant
@@ -81,19 +80,6 @@ function nlmBinGuess(): string | null {
     path.join(os.homedir(), ".local", "bin", "notebooklm-mcp"),
     "/opt/homebrew/bin/notebooklm-mcp",
     "/usr/local/bin/notebooklm-mcp",
-  ];
-  for (const g of guesses) if (existsSync(g)) return g;
-  return null;
-}
-
-// Kimi Code installs to ~/.kimi-code/bin/kimi, which the Next server's PATH
-// usually doesn't include, so `which kimi` misses it. Check the install location.
-function kimiBinGuess(): string | null {
-  const guesses = [
-    path.join(os.homedir(), ".kimi-code", "bin", "kimi"),
-    path.join(os.homedir(), ".local", "bin", "kimi"),
-    "/opt/homebrew/bin/kimi",
-    "/usr/local/bin/kimi",
   ];
   for (const g of guesses) if (existsSync(g)) return g;
   return null;
@@ -171,8 +157,6 @@ export const config: AgenticConfig = {
   antigravity: process.env.AGENTIC_OS_ANTIGRAVITY_BIN ?? fileCfg.antigravity ?? which("agy"),
   // Codex CLI (OpenAI's coding agent). Used for chat + Goal Mode + reviewing past sessions.
   codex: process.env.AGENTIC_OS_CODEX_BIN ?? fileCfg.codex ?? which("codex"),
-  // Kimi Code CLI (Kimi K2.7 "K2.7 Code"). Powers the Kimi chat + workspace + previews.
-  kimi: process.env.AGENTIC_OS_KIMI_BIN ?? fileCfg.kimi ?? which("kimi") ?? kimiBinGuess(),
   grok: process.env.AGENTIC_OS_GROK_BIN ?? fileCfg.grok ?? which("grok") ?? grokBinGuess(),
   // Ruflo (ruvnet/ruflo) — multi-agent swarm orchestration. Powers the Swarm tab.
   ruflo: process.env.AGENTIC_OS_RUFLO_BIN ?? fileCfg.ruflo ?? which("ruflo"),
@@ -206,7 +190,7 @@ export const config: AgenticConfig = {
   locationLabel: process.env.AGENTIC_OS_LOCATION ?? fileCfg.locationLabel ?? "Local",
 };
 
-export function isAgentInstalled(agent: "claude" | "openclaw" | "hermes" | "antigravity" | "codex" | "kimi"): boolean {
+export function isAgentInstalled(agent: "claude" | "openclaw" | "hermes" | "antigravity" | "codex"): boolean {
   return Boolean(config[agent]);
 }
 

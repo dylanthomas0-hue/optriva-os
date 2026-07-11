@@ -5,7 +5,7 @@ import { config } from "./config";
 // the local fcc-server proxy env vars injected, routing requests to OpenRouter
 // / NVIDIA NIM / Kimi / etc instead of api.anthropic.com.
 // "codex" is OpenAI's Codex CLI (≥ 0.125 — supports `codex exec --json` for streaming).
-export type AgentName = "claude" | "openclaw" | "hermes" | "antigravity" | "fcc" | "codex" | "kimi" | "grok" | "ruflo" | "ant";
+export type AgentName = "claude" | "openclaw" | "hermes" | "antigravity" | "fcc" | "codex" | "grok" | "ruflo" | "ant";
 
 function binFor(agent: AgentName): string {
   // fcc is a virtual agent — it spawns the regular claude binary, just with
@@ -34,7 +34,6 @@ function agentEnv(extra: Record<string, string> = {}): NodeJS.ProcessEnv {
     "/sbin",
     `${process.env.HOME ?? "/Users/REDACTED"}/.local/bin`,
     `${process.env.HOME ?? "/Users/REDACTED"}/local/node/bin`,
-    `${process.env.HOME ?? "/Users/REDACTED"}/.kimi-code/bin`,
   ];
   const existing = (base.PATH ?? "").split(":").filter(Boolean);
   const merged = [...new Set([...existing, ...ensurePath])].join(":");

@@ -47,10 +47,6 @@ const ALLOWED: Record<AgentName, RegExp[]> = {
     /^--version$/, /^--help$/, /^auth$/, /^status$/, /^models$/, /^files$/,
     /^list$/, /^beta:agents$/, /^--output$/, /^json$/, /^yaml$/,
   ],
-  kimi: [
-    // Kimi Code (K2.7) — diagnostic/read-only flags only here; chat runs via /api/kimi/chat.
-    /^--version$/, /^-V$/, /^--help$/, /^-h$/, /^doctor$/,
-  ],
   grok: [
     // Grok Build CLI (xAI grok-build) — diagnostic/read-only flags only; chat runs via its own route.
     /^--version$/, /^-v$/, /^--help$/, /^-h$/,

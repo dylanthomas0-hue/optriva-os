@@ -27,7 +27,6 @@ const NAV: NavItem[] = [
   // Gemini CLI removed 2026-06-23 — Google retired it (18 Jun 2026); Antigravity CLI (below) is its successor.
   { href: "/antigravity", label: "Antigravity", icon: <AgentAvatar agent="antigravity" size={22} />, accent: "#7c3aed", dim: "rgba(124,58,237,0.16)" },
   { href: "/codex",       label: "Codex",       icon: <AgentAvatar agent="codex" size={22} />,       accent: "#22c55e", dim: "rgba(34,197,94,0.16)" },
-  { href: "/kimi",        label: "Kimi Code",   icon: <AgentAvatar agent="kimi" size={22} />,        accent: "#00CCFF", dim: "rgba(0,204,255,0.16)" },
   { href: "/glm",         label: "GLM 5.2",     icon: <AgentAvatar agent="glm" size={22} />,         accent: "#34E5B0", dim: "rgba(52,229,176,0.16)" },
   { href: "/glm-code",    label: "GLM Code",    icon: <SquareTerminal size={18} />,                  accent: "#34E5B0", dim: "rgba(52,229,176,0.16)" },
   { href: "/bolt",        label: "Bolt.DIY",    icon: <Zap size={16} />,                             accent: "#38bdf8", dim: "rgba(56,189,248,0.16)" },
@@ -55,7 +54,7 @@ const NAV: NavItem[] = [
 
 const DEFAULT_ORDER = NAV.map((n) => n.href);
 const BY_HREF: Record<string, NavItem> = Object.fromEntries(NAV.map((n) => [n.href, n]));
-const AGENT_ROUTES = new Set(["/claude", "/openclaw", "/hermes", "/antigravity", "/codex", "/kimi", "/glm", "/grok", "/freeclaude", "/fusion", "/sakana", "/local"]);
+const AGENT_ROUTES = new Set(["/claude", "/openclaw", "/hermes", "/antigravity", "/codex", "/glm", "/grok", "/freeclaude", "/fusion", "/sakana", "/local"]);
 const LS_ORDER = "agentos.sidebar.order";
 const LS_HIDDEN = "agentos.sidebar.hidden";
 

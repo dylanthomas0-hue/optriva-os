@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 
-export type AgentKey = "claude" | "openclaw" | "hermes" | "gemini" | "antigravity" | "fcc" | "codex" | "kimi" | "glm" | "grok";
+export type AgentKey = "claude" | "openclaw" | "hermes" | "gemini" | "antigravity" | "fcc" | "codex" | "glm" | "grok";
 
 interface Props {
   agent: AgentKey;
@@ -129,18 +129,6 @@ const STYLE: Record<AgentKey, {
           <path d="M5 15.5 C 5.5 12.5, 8.5 11, 12 12 C 11 16.5, 8 18, 5 15.5 Z" />
           <path d="M5 8.5 C 8 6.5, 11.5 8, 12 12 C 8 14.5, 5 12.5, 5 8.5 Z" />
         </g>
-      </svg>
-    ),
-  },
-  kimi: {
-    // Kimi Code (Moonshot AI) — cyan/teal gradient + sharp "K" monogram.
-    accent: "#00CCFF",
-    bg: "rgba(0,204,255,0.18)",
-    gradient: "linear-gradient(135deg, #00CCFF 0%, #0099CC 55%, #064E66 100%)",
-    label: "Kimi Code",
-    glyph: (s) => (
-      <svg width={s * 0.62} height={s * 0.62} viewBox="0 0 24 24" fill="none">
-        <path d="M7 4 L7 20 M17 4 L7 12 L17 20" stroke="white" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" opacity="0.96" />
       </svg>
     ),
   },
