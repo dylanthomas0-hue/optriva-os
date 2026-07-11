@@ -42,6 +42,7 @@ export async function POST(req: Request) {
       try { ctx = await roomContext(message); } catch {}
       if (ctx.sources.length) send({ t: "context", sources: ctx.sources });
 
+      let buildStarted = false;
       for (const agent of repliers) {
         if (req.signal.aborted) break;
         send({ t: "typing", id: agent.id, name: agent.name, color: agent.color });
@@ -49,8 +50,9 @@ export async function POST(req: Request) {
         try { raw = await roomReply(agent, transcript, ctx.text, req.signal); }
         catch (e) { if (req.signal.aborted) break; raw = `(${agent.name} couldn't reply — ${String(e).slice(0, 80)})`; }
         if (!raw) raw = "…";
-        // run any NOTE:: / PIPELINE:: actions the agent emitted
-        const { clean, actions } = await executeRoomActions(raw);
+        // run any NOTE:: / PIPELINE:: / BUILD:: / LEAD:: / KANBAN:: actions the agent emitted
+        const { clean, actions } = await executeRoomActions(raw, agent.name, { allowBuild: !buildStarted });
+        if (actions.some((a) => a.kind === "build" && a.ok)) buildStarted = true;
         transcript.push({ speaker: agent.name, text: clean });
         send({ t: "msg", id: agent.id, name: agent.name, color: agent.color, text: clean });
         for (const a of actions) send({ t: "action", id: agent.id, name: agent.name, color: agent.color, ...a });

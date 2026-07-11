@@ -11,6 +11,7 @@ import { searchNotes, recentNotes, searchOmi, readNote, VAULT_AVAILABLE } from "
 import { AGENTIC_DIR } from "@/lib/vaultWriter";
 import { uniqueSlug, writeItem, type PipelineItem } from "@/lib/pipeline";
 import { config, hermesHome } from "@/lib/config";
+import { run } from "@/lib/runner";
 
 const HOME = os.homedir();
 const OLLAMA = process.env.OLLAMA_HOST || "http://localhost:11434";
@@ -152,10 +153,13 @@ const ROOM_SYSTEM =
   "Keep every message SHORT and conversational — 1 to 3 sentences, like a real chat. " +
   "Stay fully in your own character. You can agree, disagree, build on, or tease the other agents by name. " +
   "Don't repeat what someone already said. Be genuinely useful and real. No preamble, no name prefix — just your message.\n" +
-  "You can take REAL actions in the user's vault, but ONLY when they clearly ask for it:\n" +
-  "• To SAVE your point as a note in their vault, add a final line exactly: NOTE:: <a short title>\n" +
-  "• To ADD an idea to their project pipeline, add a final line exactly: PIPELINE:: <one-line idea>\n" +
-  "Use these sparingly — only when asked to save/note/remember something or add a project/idea. Write your normal chat message first, then the directive on its own final line. Never mention this directive syntax in your visible message.";
+  "You can take REAL actions, but ONLY when the user clearly asks for them. Add the directive as a final line, exactly:\n" +
+  "• NOTE:: <a short title> — save your point as a note in their vault\n" +
+  "• PIPELINE:: <one-line idea> — add an idea to their project pipeline\n" +
+  "• BUILD:: <full build prompt> — commission a REAL website/app build (GLM Code agent runs it and the finished preview link is posted back to this room). Write the complete spec in the directive itself: pages, sections, copy angle, style. Only ONE agent per round should emit BUILD:: — if another agent already committed to building this round, don't.\n" +
+  "• LEAD:: <Company Name> status=<new|mockup|contacted|won|lost> — update a lead's stage in the user's Bexley CRM\n" +
+  "• KANBAN:: <card title> | <card body> — add a tracking card to the user's bexley-factory kanban board\n" +
+  "Use these sparingly — only on a clear request (e.g. 'build it', 'mark it contacted', 'track this'). Write your normal chat message first, then the directive on its own final line. Never mention this directive syntax in your visible message.";
 
 export interface RoomTurn { speaker: string; text: string; }
 
@@ -240,7 +244,69 @@ export async function roomContext(query: string): Promise<{ text: string; source
 }
 
 // ── deeper agentic: agents can write a note to the vault or add a pipeline item ─
-export interface RoomAction { kind: "note" | "pipeline"; label: string; ok: boolean; path?: string; }
+export interface RoomAction { kind: "note" | "pipeline" | "build" | "lead" | "kanban"; label: string; ok: boolean; path?: string; }
+
+const KANBAN_BOARD = "bexley-factory";
+const LEADS_DIR = AGENTIC_DIR ? path.join(AGENTIC_DIR, "Website Factory", "Leads", "Companies") : "";
+const LEAD_STATUSES = new Set(["new", "mockup", "contacted", "won", "lost"]);
+
+// BUILD:: — fire-and-forget commission of a real GLM Code build via the dashboard's
+// own API. The stream is drained in the background; on completion the outcome (and
+// preview link for an index.html) is saved as a Room Note so the result is findable.
+function startRoomBuild(prompt: string, agentName: string): string {
+  const project = `room-${prompt.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 32)}-${Date.now().toString(36).slice(-4)}`;
+  const port = process.env.PORT || "3737";
+  void (async () => {
+    let ok = false; let resultLine = "";
+    try {
+      const r = await fetch(`http://127.0.0.1:${port}/api/glm-code/build`, {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ prompt, project }),
+      });
+      const reader = r.body?.getReader();
+      const dec = new TextDecoder();
+      let buf = "";
+      while (reader) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        let nl;
+        while ((nl = buf.indexOf("\n")) >= 0) {
+          const line = buf.slice(0, nl); buf = buf.slice(nl + 1);
+          try {
+            const j = JSON.parse(line);
+            if (j.type === "result") { ok = j.subtype === "success"; resultLine = String(j.result ?? "").slice(0, 400); }
+          } catch {}
+        }
+      }
+    } catch (e) { resultLine = `build request failed: ${String(e).slice(0, 120)}`; }
+    const preview = `/api/glm-code/preview/${project}/index.html`;
+    await saveRoomNote(
+      `Build ${ok ? "finished" : "FAILED"} — ${project}`,
+      `Commissioned from the Agent Room by ${agentName}.\n\n**Prompt:** ${prompt.slice(0, 600)}\n\n**Result:** ${resultLine || "(no result line)"}\n\n**Preview:** http://127.0.0.1:${port}${preview}\n(Also visible in the GLM Code tab under project \`${project}\`.)`
+    ).catch(() => {});
+  })();
+  return project;
+}
+
+// LEAD:: — flip a lead's status in the vault CRM (frontmatter `status:` in
+// Website Factory/Leads/Companies/<Company>.md; case-insensitive filename match).
+async function updateLeadStatus(company: string, status: string): Promise<boolean> {
+  if (!LEADS_DIR || !LEAD_STATUSES.has(status)) return false;
+  let files: string[] = [];
+  try { files = (await readdir(LEADS_DIR)).filter((f) => f.endsWith(".md")); } catch { return false; }
+  const want = company.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  const match = files.find((f) => f.slice(0, -3).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim() === want)
+    ?? files.find((f) => f.toLowerCase().includes(want.split(" ")[0] ?? "") && want.length > 3 && f.slice(0, -3).toLowerCase().replace(/[^a-z0-9]+/g, " ").includes(want));
+  if (!match) return false;
+  const full = path.join(LEADS_DIR, match);
+  try {
+    const src = await readFile(full, "utf8");
+    if (!/^status:.*$/m.test(src)) return false;
+    await writeFile(full, src.replace(/^status:.*$/m, `status: ${status}`), "utf8");
+    return true;
+  } catch { return false; }
+}
 
 async function saveRoomNote(title: string, body: string): Promise<string | null> {
   if (!AGENTIC_DIR) return null;
@@ -252,13 +318,16 @@ async function saveRoomNote(title: string, body: string): Promise<string | null>
   return `Agent OS/Room Notes/${slug}.md`;
 }
 
-// Parse + run NOTE:: / PIPELINE:: directives from an agent's reply. Returns the
-// cleaned message (directives stripped) + the actions actually taken.
-export async function executeRoomActions(text: string): Promise<{ clean: string; actions: RoomAction[] }> {
+// Parse + run NOTE:: / PIPELINE:: / BUILD:: / LEAD:: / KANBAN:: directives from an
+// agent's reply. Returns the cleaned message (directives stripped) + actions taken.
+export async function executeRoomActions(text: string, agentName = "an agent", opts?: { allowBuild?: boolean }): Promise<{ clean: string; actions: RoomAction[] }> {
   const actions: RoomAction[] = [];
   const noteM = text.match(/^\s*NOTE::\s*(.+?)\s*$/im);
   const pipeM = text.match(/^\s*PIPELINE::\s*(.+?)\s*$/im);
-  const clean = text.replace(/^\s*(?:NOTE|PIPELINE)::.*$/gim, "").replace(/\n{3,}/g, "\n\n").trim();
+  const buildM = text.match(/^\s*BUILD::\s*(.+?)\s*$/im);
+  const leadM = text.match(/^\s*LEAD::\s*(.+?)\s+status=([a-z]+)\s*$/im);
+  const kanbanM = text.match(/^\s*KANBAN::\s*(.+?)\s*$/im);
+  const clean = text.replace(/^\s*(?:NOTE|PIPELINE|BUILD|LEAD|KANBAN)::.*$/gim, "").replace(/\n{3,}/g, "\n\n").trim();
 
   if (noteM) {
     const title = noteM[1].trim().slice(0, 80) || "Room note";
@@ -273,6 +342,40 @@ export async function executeRoomActions(text: string): Promise<{ clean: string;
       await writeItem(item);
       actions.push({ kind: "pipeline", label: idea.slice(0, 60), ok: true });
     } catch { actions.push({ kind: "pipeline", label: idea.slice(0, 60), ok: false }); }
+  }
+  if (buildM) {
+    const prompt = buildM[1].trim();
+    if (opts?.allowBuild === false) {
+      // Another agent already commissioned a build this round — models sometimes
+      // all volunteer despite the prompt telling them not to. One build per round.
+      actions.push({ kind: "build", label: "skipped — a build is already running this round", ok: false });
+    } else if (prompt.length >= 20) {
+      const project = startRoomBuild(prompt, agentName);
+      actions.push({ kind: "build", label: project, ok: true, path: `/api/glm-code/preview/${project}/index.html` });
+    } else {
+      actions.push({ kind: "build", label: "prompt too short", ok: false });
+    }
+  }
+  if (leadM) {
+    const company = leadM[1].trim();
+    const status = leadM[2].toLowerCase();
+    const ok = await updateLeadStatus(company, status);
+    actions.push({ kind: "lead", label: `${company} → ${status}`, ok });
+  }
+  if (kanbanM) {
+    const [titlePart, ...bodyParts] = kanbanM[1].split("|");
+    const title = (titlePart ?? "").trim().slice(0, 200);
+    const cardBody = bodyParts.join("|").trim().slice(0, 2000);
+    if (title) {
+      try {
+        const args = ["kanban", "--board", KANBAN_BOARD, "create", title, "--json"];
+        if (cardBody) args.push("--body", cardBody);
+        const out = await run("hermes", args, { timeoutMs: 20_000 });
+        actions.push({ kind: "kanban", label: title.slice(0, 60), ok: out.ok });
+      } catch { actions.push({ kind: "kanban", label: title.slice(0, 60), ok: false }); }
+    } else {
+      actions.push({ kind: "kanban", label: "missing title", ok: false });
+    }
   }
   return { clean: clean || text, actions };
 }

@@ -100,7 +100,20 @@ export default function GroupChatView() {
               if (j.t === "typing") setTyping({ id: j.id, name: j.name, color: j.color });
               else if (j.t === "msg") { setTyping(null); setMsgs((m) => [...m, { key: ++keyRef.current, who: j.id, name: j.name, color: j.color, text: j.text }]); }
               else if (j.t === "context") { const s = (j.sources || []).map((x: { title: string }) => x.title).join(" · "); setMsgs((m) => [...m, { key: ++keyRef.current, who: "system", kind: "context", text: `Read your vault — ${s}` }]); }
-              else if (j.t === "action") { const label = j.kind === "note" ? `saved a note: ${j.label}` : `added to your Pipeline: ${j.label}`; setMsgs((m) => [...m, { key: ++keyRef.current, who: "system", kind: "action", color: j.color, text: `${j.name} ${j.ok === false ? "tried to save (failed)" : label}` }]); }
+              else if (j.t === "action") {
+                const label =
+                  j.kind === "note" ? `saved a note: ${j.label}` :
+                  j.kind === "build" ? `🔨 started a real build: ${j.label} — preview lands in Room Notes + the GLM Code tab when done` :
+                  j.kind === "lead" ? `updated lead: ${j.label}` :
+                  j.kind === "kanban" ? `added a kanban card: ${j.label}` :
+                  `added to your Pipeline: ${j.label}`;
+                const failLabel =
+                  j.kind === "build" ? `tried to start a build (failed: ${j.label})` :
+                  j.kind === "lead" ? `tried to update a lead (not found / bad status: ${j.label})` :
+                  j.kind === "kanban" ? `tried to add a kanban card (failed: ${j.label})` :
+                  "tried to save (failed)";
+                setMsgs((m) => [...m, { key: ++keyRef.current, who: "system", kind: "action", color: j.color, text: `${j.name} ${j.ok === false ? failLabel : label}` }]);
+              }
               else if (j.t === "done") setTyping(null);
             } catch {}
           }
