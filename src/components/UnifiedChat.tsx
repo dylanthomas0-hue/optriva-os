@@ -523,7 +523,7 @@ export default function UnifiedChat({
                     </span>
                     {agent !== "claude" && elapsedMs > 30_000 && (
                       <span className="text-[11px] text-amber-300/80 ml-1">
-                        (slow model, usually 20–40s)
+                        (taking longer than usual — normally under 10s)
                       </span>
                     )}
                   </span>
