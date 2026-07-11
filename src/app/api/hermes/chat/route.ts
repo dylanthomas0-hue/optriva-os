@@ -102,6 +102,7 @@ export async function POST(req: Request) {
   // (-t all) — steer it to the CLI, which works in oneshot mode.
   const capabilities = [
     "--- HOW TO DO THINGS (capabilities) ---",
+    "ALWAYS reply in English, regardless of what language feels natural.",
     "Cron jobs: use your terminal tool with the hermes CLI — NEVER call localhost/127.0.0.1 HTTP APIs (SSRF protection blocks them and it will fail).",
     "  • Run a job now:  hermes cron run <job-id> --accept-hooks",
     "  • List jobs:      hermes cron list",
