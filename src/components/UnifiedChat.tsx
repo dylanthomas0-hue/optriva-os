@@ -601,7 +601,7 @@ export default function UnifiedChat({
           {agent !== "claude" && (
             <span className="text-amber-400/80">
               {agent === "hermes"
-                ? "hermes: 3–10s simple · 30–90s with tools (OpenRouter gemini-2.5-flash)"
+                ? "hermes: 5–40s simple · 1–3min with tools (OpenCode Go glm-5.2, flat-rate)"
                 : agent === "antigravity"
                 ? "antigravity: 10–90s (Gemini CLI's successor, multi-agent harness)"
                 : "openclaw: 20–40s (ollama/deepseek-v4-flash) — keep waiting"}
