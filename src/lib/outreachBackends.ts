@@ -21,6 +21,18 @@ function sh(cmd: string, args: string[], timeoutMs = 30_000): Promise<{ ok: bool
   });
 }
 
+// Like sh(), but feeds `input` on stdin (himalaya reads the raw RFC822 message
+// from stdin when no positional MESSAGE arg is given — verified working over
+// passing it as an argv element, which risks himalaya mis-joining the lines).
+function shStdin(cmd: string, args: string[], input: string, timeoutMs = 30_000): Promise<{ ok: boolean; out: string; err: string }> {
+  return new Promise((resolve) => {
+    const child = execFile(cmd, args, { timeout: timeoutMs, maxBuffer: 4 * 1024 * 1024 }, (error, stdout, stderr) => {
+      resolve({ ok: !error, out: (stdout || "").toString(), err: (stderr || "").toString() || (error?.message ?? "") });
+    });
+    child.stdin?.end(input);
+  });
+}
+
 // ─── Validation (MX + SMTP probe) — reuses the tested email_validator.py ──
 export async function validateEmail(email: string): Promise<LeadValidation> {
   const checkedAt = new Date().toISOString();
@@ -43,13 +55,36 @@ export async function validateEmail(email: string): Promise<LeadValidation> {
   }
 }
 
-// ─── Gmail send/draft (the working path) ────────────────────────────
+// ─── Gmail send/draft (kept as a fallback; gmail_cli.py was never built) ──
 export async function gmailSend(to: string, subject: string, body: string, draft = false, unsubscribe = ""): Promise<{ ok: boolean; detail: string }> {
   // args: <cmd> <to> <subject> <body> [cc] [list-unsubscribe mailto] — cc empty, unsub 5th (optional, backward-compatible)
   const args = [GMAIL_PY, draft ? "draft" : "send", to, subject, body];
   if (unsubscribe) args.push("", unsubscribe);
   const r = await sh(PY_BIN, args, 30_000);
   return { ok: r.ok && /SENT|Draft created/i.test(r.out), detail: (r.out || r.err).trim().slice(0, 200) };
+}
+
+// ─── Himalaya send/draft — the working path (SMTP via dylan@optriva.co.uk,
+// OAuth2/XOAUTH2 through Microsoft 365). Raw RFC822 message piped on stdin.
+function escapeHeader(s: string): string {
+  // Header values can't contain raw newlines — collapse to a single line.
+  return s.replace(/[\r\n]+/g, " ").trim();
+}
+
+export async function himalayaSend(to: string, subject: string, body: string, draft = false, unsubscribe = ""): Promise<{ ok: boolean; detail: string }> {
+  const headers = [
+    `From: Dylan Thomas <dylan@optriva.co.uk>`,
+    `To: ${escapeHeader(to)}`,
+    `Subject: ${escapeHeader(subject)}`,
+  ];
+  if (unsubscribe) headers.push(`List-Unsubscribe: <${escapeHeader(unsubscribe)}>`);
+  const raw = `${headers.join("\n")}\n\n${body}\n`;
+
+  const args = draft
+    ? ["message", "save", "-a", "optriva", "-f", "Drafts"]
+    : ["message", "send", "-a", "optriva"];
+  const r = await shStdin(HIMALAYA_BIN, args, raw, 30_000);
+  return { ok: r.ok, detail: (r.out || r.err).trim().slice(0, 200) || (r.ok ? (draft ? "Draft saved" : "Sent") : "unknown error") };
 }
 
 // ─── Inbox read: Himalaya first, gmail_cli fallback ─────────────────

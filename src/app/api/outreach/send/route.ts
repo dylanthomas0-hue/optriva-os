@@ -4,7 +4,7 @@ import {
   appendOptOut, unsubMailto,
   type SendLogEntry,
 } from "@/lib/outreach";
-import { gmailSend } from "@/lib/outreachBackends";
+import { himalayaSend } from "@/lib/outreachBackends";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,7 +14,7 @@ export const maxDuration = 300;
 const FROM = "dylan@optriva.co.uk";
 
 // POST { campaignId, mode?: "send"|"draft", step?: number, limit?: number, includeRisky?: boolean }
-// Sends (or drafts) the next batch for a campaign through gmail_cli.py.
+// Sends (or drafts) the next batch for a campaign through Himalaya SMTP.
 // Guardrails: circuit breaker, per-day cap, and valid-only recipients.
 export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
@@ -71,7 +71,7 @@ export async function POST(req: Request) {
     const subject = renderTemplate(tpl.subject, lead).trim() || "(no subject)";
     // Every send carries a working opt-out: a plain-text footer + a List-Unsubscribe header.
     const bodyText = appendOptOut(renderTemplate(tpl.body, lead), FROM);
-    const r = await gmailSend(lead.email!, subject, bodyText, mode === "draft", unsubMailto(FROM, lead));
+    const r = await himalayaSend(lead.email!, subject, bodyText, mode === "draft", unsubMailto(FROM, lead));
     const entry: SendLogEntry = {
       id: newId(), campaignId: camp.id, leadId: lead.id,
       to: lead.email!, domain: lead.domain, subject, body: bodyText, step,

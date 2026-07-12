@@ -758,9 +758,8 @@ function SettingsView({ flash, onChanged }: { flash: (m: string) => void; onChan
 
         <div className="panel p-4">
           <div className="text-[11px] uppercase tracking-widest mb-1" style={{ color: GOLD }}>Backends</div>
-          <StatusRow ok={d.gmail.ready} label={<span className="flex items-center gap-1">Gmail send · <EmailText value={d.gmail.mailbox} /></span>} hint={d.gmail.ready ? "connected" : "sa-key missing"} />
+          <StatusRow ok={d.himalaya.ready} label={<span className="flex items-center gap-1">Himalaya send + read · <EmailText value={d.gmail.mailbox} /></span>} hint={d.himalaya.ready ? "connected (SMTP + IMAP)" : "not configured"} />
           <StatusRow ok={d.hunter.configured} label="Hunter.io (find · verify · size)" hint={d.hunter.configured ? "key set" : "no key"} />
-          <StatusRow ok={d.himalaya.ready} label="Himalaya inbox read" hint={d.himalaya.ready ? "active (dylan@optriva.co.uk)" : "not configured"} />
           <StatusRow ok={d.firecrawl.configured} label="Firecrawl enrichment" hint={d.firecrawl.configured ? "key set" : "no key"} />
           <StatusRow ok={d.apollo.configured} label="Apollo.io sourcing" hint={d.apollo.configured ? "key set" : "no key"} />
         </div>
