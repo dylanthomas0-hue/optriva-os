@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <key>Label</key>
+    <string>ai.agentos.missiond</string>
+    <key>Comment</key>
+    <string>Agent OS execution kernel — mission queue dispatcher (install: cp to ~/Library/LaunchAgents + launchctl bootstrap gui/$UID)</string>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+    <key>ProgramArguments</key>
+    <array>
+      <string>/opt/homebrew/bin/node</string>
+      <string>/Users/dylanthomas/agent-os/source/scripts/mission-dispatcher.mjs</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/Users/dylanthomas/agent-os/source</string>
+    <key>StandardInPath</key>
+    <string>/dev/null</string>
+    <key>StandardOutPath</key>
+    <string>/Users/dylanthomas/.agentic-os/missions/dispatcher.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/dylanthomas/.agentic-os/missions/dispatcher.log</string>
+  </dict>
+</plist>
