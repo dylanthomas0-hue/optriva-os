@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
-import { LayoutGrid, Brain, Sparkles as SparklesIcon, TrendingUp, Columns3, NotebookText, Film, Building2, Workflow, MessagesSquare, Image as ImageIcon, Gamepad2, Music2, Network, Clapperboard, Repeat, Cpu, LayoutDashboard, Palette, GripVertical, Eye, EyeOff, SlidersHorizontal, Check, SquareTerminal, Zap, Ship } from "lucide-react";
+import { LayoutGrid, Brain, Sparkles as SparklesIcon, TrendingUp, Columns3, NotebookText, Film, Building2, Workflow, MessagesSquare, Image as ImageIcon, Gamepad2, Music2, Network, Clapperboard, Repeat, Cpu, LayoutDashboard, Palette, GripVertical, Eye, EyeOff, SlidersHorizontal, Check, SquareTerminal, Zap, Ship, Rocket } from "lucide-react";
 import { useState, useEffect, type ReactNode } from "react";
 import AgentAvatar from "./AgentAvatar";
 
@@ -17,6 +17,7 @@ interface NavItem {
 
 const NAV: NavItem[] = [
   { href: "/",         label: "Mission Control", icon: <LayoutGrid size={16} />, accent: "#a855f7", dim: "rgba(168,85,247,0.16)" },
+  { href: "/missions", label: "Missions", icon: <Rocket size={16} />, accent: "#4ade80", dim: "rgba(74,222,128,0.16)" },
   { href: "/paperclip", label: "Paperclip", icon: <Building2 size={16} />, accent: "#d4a574", dim: "rgba(212,165,116,0.16)" },
   { href: "/room",     label: "AI Agent Mastermind", icon: <MessagesSquare size={16} />, accent: "#a855f7", dim: "rgba(168,85,247,0.16)" },
   { href: "/pipeline", label: "Pipeline", icon: <Workflow size={16} />, accent: "#34d399", dim: "rgba(52,211,153,0.16)" },
@@ -61,7 +62,7 @@ const LS_HIDDEN = "agentos.sidebar.hidden";
 // Sidebar grouping. Mission Control sits under the top "Workspace" header;
 // Paperclip + AI Agent Mastermind + Pipeline + Agent Kanban get their own "Agent Orchestration" group;
 // the model agents under "Agents"; everything else under "Self".
-const ORCHESTRATION_ROUTES = new Set(["/paperclip", "/room", "/pipeline", "/agent-kanban"]);
+const ORCHESTRATION_ROUTES = new Set(["/missions", "/paperclip", "/room", "/pipeline", "/agent-kanban"]);
 function sectionOf(href: string): string {
   if (href === "/") return "Workspace";
   if (ORCHESTRATION_ROUTES.has(href)) return "Agent Orchestration";
