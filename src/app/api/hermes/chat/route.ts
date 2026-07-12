@@ -1,8 +1,22 @@
 import { NextResponse } from "next/server";
 import { run } from "@/lib/runner";
 import { hermesHome } from "@/lib/config";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, appendFile, mkdirSync } from "node:fs";
 import path from "node:path";
+import os from "node:os";
+
+// Phase timing for every chat request → ~/.agentic-os/metrics/hermes-chat.ndjson.
+// Benchmarks (2026-07-12): hermes -z has a 4–9s floor from agent init alone —
+// the model round-trip through Headroom is only 1–2s and the toolset choice is
+// noise. This file is how regressions (and router decisions) stay visible.
+const METRICS_DIR = path.join(os.homedir(), ".agentic-os", "metrics");
+function logMetric(entry: Record<string, unknown>) {
+  try {
+    mkdirSync(METRICS_DIR, { recursive: true });
+    appendFile(path.join(METRICS_DIR, "hermes-chat.ndjson"),
+      JSON.stringify({ ts: Date.now(), ...entry }) + "\n", () => {});
+  } catch {}
+}
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -65,6 +79,7 @@ function buildPromptWithHistory(history: ChatMsg[], current: string): string {
 }
 
 export async function POST(req: Request) {
+  const t0 = Date.now();
   const { prompt, profile, history } = await req.json();
   if (typeof prompt !== "string" || prompt.length === 0) {
     return NextResponse.json({ error: "missing prompt" }, { status: 400 });
@@ -114,7 +129,10 @@ export async function POST(req: Request) {
     : `${capabilities}\n\n${buildPromptWithHistory(history, prompt)}`;
   // -t all gives Hermes every tool (cron, kanban, file, web, terminal, browser, etc.)
   // Without it, oneshot mode loads a limited subset and can't manage crons or kanban.
+  const promptBuildMs = Date.now() - t0;
   const out = await run("hermes", [...profileArgs, "-z", fullPrompt, "-t", "all", "--yolo", "--accept-hooks"], { timeoutMs: TIMEOUT_MS });
+  logMetric({ kind: "chat", promptBuildMs, runMs: out.durationMs,
+    totalMs: Date.now() - t0, promptBytes: fullPrompt.length, exitCode: out.code });
 
   const text = out.stdout.replace(ANSI_STRIP, "").trim();
   const stderrClean = out.stderr.replace(ANSI_STRIP, "").trim();
@@ -158,6 +176,7 @@ export async function POST(req: Request) {
     text: text || diagnostic || "(no response)",
     empty: !text,
     durationMs: out.durationMs,
+    phases: { promptBuildMs, runMs: out.durationMs, totalMs: Date.now() - t0 },
     exitCode: out.code,
     timedOut: !text && out.durationMs >= TIMEOUT_MS - 2_000,
     stderr: stderrClean, // full, no trunc — useful for diagnosing
