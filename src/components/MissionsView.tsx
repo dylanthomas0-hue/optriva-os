@@ -23,6 +23,26 @@ interface Mission {
   history: { state: string; at: number; note?: string }[];
 }
 interface KernelEvent { ts: number; type: string; missionId: string; taskId?: string; data?: Record<string, unknown>; }
+interface KernelStats {
+  missions: number; active: number; successRate: number | null;
+  avgQueueMs: number; avgExecMs: number; verifierRejectionRate: number | null;
+  retryRate: number | null; throughput24h: number; waitReasons: [string, number][];
+}
+
+function fmtDur(ms: number): string {
+  if (ms < 1000) return `${ms}ms`;
+  const s = Math.round(ms / 1000);
+  return s < 60 ? `${s}s` : s < 3600 ? `${Math.floor(s / 60)}m${s % 60}s` : `${(s / 3600).toFixed(1)}h`;
+}
+
+function Stat({ label, value, title }: { label: string; value: string; title?: string }) {
+  return (
+    <div className="px-3 py-1.5 rounded-lg border border-[var(--panel-border)] bg-[rgba(255,255,255,0.02)]" title={title}>
+      <div className="text-[9.5px] uppercase tracking-wider text-[var(--fg-dimmer)]">{label}</div>
+      <div className="text-[13px] font-semibold text-[var(--fg)] font-[var(--font-geist-mono)]">{value}</div>
+    </div>
+  );
+}
 
 const COLUMNS: { key: string; label: string; states: string[] }[] = [
   { key: "queued",   label: "Queued",   states: ["queued"] },
@@ -69,6 +89,7 @@ function fmtElapsed(t: Task): string {
 
 export default function MissionsView() {
   const [missions, setMissions] = useState<Mission[]>([]);
+  const [stats, setStats] = useState<KernelStats | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [detail, setDetail] = useState<{ mission: Mission; log: string } | null>(null);
   const [replay, setReplay] = useState<KernelEvent[] | null>(null);
@@ -83,6 +104,8 @@ export default function MissionsView() {
       const r = await fetch("/api/missions", { cache: "no-store" });
       const j = await r.json();
       setMissions(j.missions ?? []);
+      const s = await fetch("/api/missions/stats", { cache: "no-store" });
+      if (s.ok) setStats(await s.json());
     } catch { /* dashboard restarting */ }
   }, []);
 
@@ -144,6 +167,21 @@ export default function MissionsView() {
           <RefreshCw size={14} />
         </button>
       </header>
+
+      {stats && (
+        <div className="flex flex-wrap gap-2">
+          <Stat label="missions" value={`${stats.missions} (${stats.active} active)`} />
+          <Stat label="success rate" value={stats.successRate === null ? "—" : `${Math.round(stats.successRate * 100)}%`} title="verified / all finished" />
+          <Stat label="avg queue" value={fmtDur(stats.avgQueueMs)} title="created → first task started" />
+          <Stat label="avg exec" value={fmtDur(stats.avgExecMs)} title="started → finished" />
+          <Stat label="verifier rejections" value={stats.verifierRejectionRate === null ? "—" : `${Math.round(stats.verifierRejectionRate * 100)}%`} title="rejected verdicts / all verdicts — rising means executors are drifting" />
+          <Stat label="retry rate" value={stats.retryRate === null ? "—" : `${Math.round(stats.retryRate * 100)}%`} />
+          <Stat label="verified /24h" value={String(stats.throughput24h)} />
+          {stats.waitReasons.length > 0 && (
+            <Stat label="top wait reason" value={`${stats.waitReasons[0][0]} ×${stats.waitReasons[0][1]}`} />
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-4 gap-3 flex-1 min-h-0">
         {COLUMNS.map((col) => {
