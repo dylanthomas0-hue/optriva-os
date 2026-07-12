@@ -41,19 +41,21 @@ console.log(`missiond up (pid ${process.pid}) — watching ${MISSIONS_DIR}`);
 const running = new Map();
 const lastWaitReason = new Map(); // throttle scheduler.wait events to reason changes
 
-// ── crash recovery: tasks marked running whose pid is gone → retrying ──
+// ── crash recovery: any task marked running/assigned is unsupervised after a
+// restart — even if its pid is still alive, nobody is watching for its exit
+// (the close handler died with the old dispatcher). Kill leftovers and requeue.
 for (const mission of listMissions()) {
   let changed = false;
   for (const task of mission.tasks) {
-    if ((task.state === "running" || task.state === "assigned") && task.pid) {
-      let alive = false;
-      try { process.kill(task.pid, 0); alive = true; } catch { /* dead */ }
-      if (!alive) {
-        setTaskState(mission, task, "retrying", "dispatcher restart: worker pid dead");
-        task.retryAt = Date.now();
-        task.pid = undefined;
-        changed = true;
+    if (task.state === "running" || task.state === "assigned") {
+      if (task.pid) {
+        try { process.kill(task.pid, "SIGKILL"); console.log(`restart sweep: killed orphaned pid ${task.pid} (${mission.id}/${task.id})`); }
+        catch { /* already dead */ }
       }
+      setTaskState(mission, task, "retrying", "dispatcher restart: worker unsupervised, requeued");
+      task.retryAt = Date.now();
+      task.pid = undefined;
+      changed = true;
     }
   }
   if (changed) { deriveMissionState(mission); saveMission(mission); }
