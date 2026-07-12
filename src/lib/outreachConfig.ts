@@ -16,6 +16,7 @@ const SHARED_FIRECRAWL = path.join(hermesHome(), "credentials", "firecrawl.json"
 export interface OutreachConfig {
   firecrawlKey?: string;
   hunterKey?: string;
+  apolloKey?: string;
 }
 
 export async function readOutreachConfig(): Promise<OutreachConfig> {
@@ -53,6 +54,20 @@ export async function hunterKeySource(): Promise<"scoped" | "env" | "none"> {
   const cfg = await readOutreachConfig();
   if (cfg.hunterKey) return "scoped";
   if (process.env.HUNTER_API_KEY) return "env";
+  return "none";
+}
+
+export async function getApolloKey(): Promise<string | null> {
+  const cfg = await readOutreachConfig();
+  if (cfg.apolloKey) return cfg.apolloKey;
+  if (process.env.APOLLO_API_KEY) return process.env.APOLLO_API_KEY;
+  return null;
+}
+
+export async function apolloKeySource(): Promise<"scoped" | "env" | "none"> {
+  const cfg = await readOutreachConfig();
+  if (cfg.apolloKey) return "scoped";
+  if (process.env.APOLLO_API_KEY) return "env";
   return "none";
 }
 

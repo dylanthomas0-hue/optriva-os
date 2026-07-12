@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { readState, writeState, GMAIL_PY } from "@/lib/outreach";
-import { getFirecrawlKey, firecrawlKeySource, getHunterKey, hunterKeySource, maskKey, writeOutreachConfig } from "@/lib/outreachConfig";
+import { getFirecrawlKey, firecrawlKeySource, getHunterKey, hunterKeySource, getApolloKey, apolloKeySource, maskKey, writeOutreachConfig } from "@/lib/outreachConfig";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,11 +17,14 @@ export async function GET() {
   const source = await firecrawlKeySource();
   const hkey = await getHunterKey();
   const hsource = await hunterKeySource();
+  const akey = await getApolloKey();
+  const asource = await apolloKeySource();
   const gmailReady = existsSync(path.join(HOME, ".gmail-mcp", "sa-key.json")) && existsSync(GMAIL_PY);
   const himalayaReady = existsSync(path.join(HOME, ".config", "himalaya", "REDACTED.pass"));
   return NextResponse.json({
     firecrawl: { configured: Boolean(fkey), masked: maskKey(fkey), source },
     hunter: { configured: Boolean(hkey), masked: maskKey(hkey), source: hsource },
+    apollo: { configured: Boolean(akey), masked: maskKey(akey), source: asource },
     gmail: { ready: gmailReady, mailbox: "hermes@REDACTED.agency" },
     himalaya: { ready: himalayaReady },
     dailyCap: state.meta.dailyCap,
@@ -46,6 +49,13 @@ export async function POST(req: Request) {
     if (key && key.length < 10) return NextResponse.json({ error: "that doesn't look like a valid key" }, { status: 400 });
     await writeOutreachConfig({ hunterKey: key || undefined });
     out.hunter = key ? { configured: true, masked: maskKey(key), source: "scoped" } : { configured: false };
+  }
+
+  if (typeof body.apolloKey === "string") {
+    const key = body.apolloKey.trim();
+    if (key && key.length < 10) return NextResponse.json({ error: "that doesn't look like a valid key" }, { status: 400 });
+    await writeOutreachConfig({ apolloKey: key || undefined });
+    out.apollo = key ? { configured: true, masked: maskKey(key), source: "scoped" } : { configured: false };
   }
 
   if (body.dailyCap !== undefined || body.paused !== undefined) {

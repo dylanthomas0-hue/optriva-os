@@ -656,11 +656,12 @@ function SentView({ s }: { s: FullState }) {
 
 // ─── Settings (API keys, cap, pause) ────────────────────────────────
 interface KeyStatus { configured: boolean; masked: string; source: string }
-interface SettingsData { firecrawl: KeyStatus; hunter: KeyStatus; gmail: { ready: boolean; mailbox: string }; himalaya: { ready: boolean }; dailyCap: number; paused: boolean }
+interface SettingsData { firecrawl: KeyStatus; hunter: KeyStatus; apollo: KeyStatus; gmail: { ready: boolean; mailbox: string }; himalaya: { ready: boolean }; dailyCap: number; paused: boolean }
 function SettingsView({ flash, onChanged }: { flash: (m: string) => void; onChanged: () => void }) {
   const [d, setD] = useState<SettingsData | null>(null);
   const [key, setKey] = useState("");
   const [hkey, setHkey] = useState("");
+  const [akey, setAkey] = useState("");
   const [cap, setCap] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -717,6 +718,20 @@ function SettingsView({ flash, onChanged }: { flash: (m: string) => void; onChan
         )}
         <div className="text-[10.5px] text-[var(--fg-dimmer)]">Stored at ~/.agentic-os/outreach/config.json (chmod 600) — scoped to this tool, never shown in full.</div>
       </div>
+
+      <div className="panel p-4 space-y-3" style={{ boxShadow: `inset 0 0 0 1px ${d.apollo.configured ? EMERALD + "44" : "transparent"}` }}>
+        <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-widest" style={{ color: GOLD }}><KeyRound size={13} />Apollo.io API key <span className="text-[9px] text-[var(--fg-dimmer)] normal-case tracking-normal">· optional, paid</span></div>
+        <div className="text-[11.5px] text-[var(--fg-dim)]">People-search sourcing for net-new leads. {d.apollo.configured
+          ? <span style={{ color: EMERALD }}>Set ({d.apollo.masked}, from {d.apollo.source}).</span>
+          : <span style={{ color: RUST }}>Not set — Apollo sourcing unavailable.</span>}</div>
+        <div className="flex gap-2">
+          <input value={akey} onChange={(e) => setAkey(e.target.value)} type="password" placeholder="apollo api key…" className="flex-1 bg-[var(--bg-card)] border rounded-xl px-3 py-2 text-[12.5px] outline-none font-mono" style={{ borderColor: "var(--panel-border)" }} />
+          <button onClick={() => { if (akey.trim()) { save({ apolloKey: akey.trim() }, "Apollo key saved."); setAkey(""); } }} disabled={busy || !akey.trim()} className="px-3.5 py-2 rounded-xl text-[12.5px] font-medium disabled:opacity-40" style={{ background: `${GOLD}22`, color: GOLD_SOFT, boxShadow: `inset 0 0 0 1px ${GOLD}55` }}>Save key</button>
+        </div>
+        {d.apollo.configured && d.apollo.source === "scoped" && (
+          <button onClick={() => save({ apolloKey: "" }, "Apollo key removed.")} disabled={busy} className="flex items-center gap-1.5 text-[11.5px] text-[var(--fg-dimmer)]"><X size={12} />Remove key</button>
+        )}
+      </div>
       </div>
 
       {/* controls + status */}
@@ -747,6 +762,7 @@ function SettingsView({ flash, onChanged }: { flash: (m: string) => void; onChan
           <StatusRow ok={d.hunter.configured} label="Hunter.io (find · verify · size)" hint={d.hunter.configured ? "key set" : "no key"} />
           <StatusRow ok={d.himalaya.ready} label="Himalaya inbox read" hint={d.himalaya.ready ? "active" : "add REDACTED.pass"} />
           <StatusRow ok={d.firecrawl.configured} label="Firecrawl enrichment" hint={d.firecrawl.configured ? "key set" : "no key"} />
+          <StatusRow ok={d.apollo.configured} label="Apollo.io sourcing" hint={d.apollo.configured ? "key set" : "no key"} />
         </div>
       </div>
     </div>
