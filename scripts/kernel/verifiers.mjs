@@ -57,4 +57,35 @@ export const verifiers = {
       return { verdict: "rejected", error: String(e.message).slice(-400), evidence };
     }
   },
+
+  // Frontend redesign: real work + a working build, not an executor's word.
+  // "verified" requires BOTH: git HEAD moved since the driver's before-snapshot
+  // (something actually changed, not a no-op run) AND the rebuild produced a
+  // non-trivial bundle (a broken build after "improvements" is a rejection).
+  "website-redesign"(task, ctx) {
+    const repo = "/Users/dylanthomas/optriva-website";
+    const evidence = [];
+    try {
+      const before = readFileSync(`${repo}/.redesign-before-head`, "utf8").trim();
+      const after = runCheck(`cd ${repo} && git rev-parse HEAD`).trim();
+      if (before === after) {
+        return { verdict: "rejected", error: "git HEAD unchanged — no commit was made, no real work done", evidence };
+      }
+      evidence.push({ type: "commit", value: `${before.slice(0, 7)} → ${after.slice(0, 7)}`, capturedAt: Date.now() });
+
+      const bundleStat = statSync(`${repo}/frontend/build/static/js`, { throwIfNoEntry: false });
+      const idx = statSync(`${repo}/frontend/build/index.html`, { throwIfNoEntry: false });
+      if (!idx || !bundleStat) {
+        return { verdict: "rejected", error: "frontend/build missing or incomplete after rebuild — build likely failed", evidence };
+      }
+      const rebuildLog = readFileSync(`${repo}/build/redesign-rebuild.log`, "utf8");
+      if (/Failed to compile|error TS|SyntaxError/i.test(rebuildLog)) {
+        return { verdict: "rejected", error: "rebuild log shows compile errors", evidence: [...evidence, { type: "log", value: rebuildLog.slice(-1000), capturedAt: Date.now() }] };
+      }
+      evidence.push({ type: "log", value: "frontend rebuilt successfully — NOT deployed to production; review then deploy manually", capturedAt: Date.now() });
+      return { verdict: "verified", evidence };
+    } catch (e) {
+      return { verdict: "rejected", error: String(e.message).slice(-400), evidence };
+    }
+  },
 };

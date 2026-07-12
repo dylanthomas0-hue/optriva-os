@@ -41,9 +41,23 @@ const DEFAULT_REGISTRY: Registry = {
     dailyBudget: { openclaw: 100, hermes: 100, shell: 200 },
   },
   capabilities: {
+    // Checked before "website" — more specific match phrases, so a redesign
+    // request never falls through to the build pipeline (which would just
+    // re-verify already-done stages and report false success instantly).
+    "website-redesign": {
+      match: ["improve the website", "improve website", "redesign the website", "redesign website",
+        "revamp the website", "website animations", "website look", "website design",
+        "polish the website", "enhance the website", "upgrade the website design"],
+      planner: null,
+      verifier: "website-redesign",
+      executor: { kind: "shell", script: "/Users/dylanthomas/.hermes/scripts/website-redesign.sh" },
+      schedulerPool: "hermes",
+      priority: "normal",
+      timeoutMs: 45 * 60 * 1000,
+    },
     website: {
       match: ["website", "optriva site", "landing page", "web site", "deploy the site"],
-      planner: null, // Phase 4 swaps in the "website" planner; until then the cron driver runs all stages
+      planner: "website",
       verifier: "website",
       executor: { kind: "hermes-cron", job: "c6cce5cc4875" },
       schedulerPool: "hermes",

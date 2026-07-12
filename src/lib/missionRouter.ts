@@ -13,7 +13,7 @@ export interface Route {
 
 // A dispatchable message must START with (or contain right after a greeting)
 // a task-imperative verb. "how do I build a website?" must not match.
-const IMPERATIVE = /^(?:please\s+|can you\s+|could you\s+)?(build|create|make|deploy|launch|fix|update|rebuild|redeploy|automate|schedule|monitor|scrape|research|generate|set up|setup|run)\b/i;
+const IMPERATIVE = /^(?:please\s+|can you\s+|could you\s+)?(build|create|make|deploy|launch|fix|update|rebuild|redeploy|automate|schedule|monitor|scrape|research|generate|set up|setup|run|improve|redesign|revamp|enhance|upgrade|polish)\b/i;
 
 // Hard conversational guards — any of these means "talk, don't dispatch".
 const QUESTION = /^(what|why|how|when|where|who|which|is|are|was|were|am|do|does|did|can|could|should|would|will|has|have|tell me|explain)\b/i;
