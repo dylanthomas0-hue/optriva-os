@@ -9,6 +9,9 @@ import { PY_BIN, GMAIL_PY, VALIDATOR_PY, domainSize, type LeadValidation, type C
 import { getFirecrawlKey, getHunterKey } from "./outreachConfig";
 
 const HOME = os.homedir();
+// Built via `cargo install himalaya --features oauth2` — the launchd-supervised
+// dashboard service's PATH doesn't include ~/.cargo/bin, so this must be absolute.
+const HIMALAYA_BIN = path.join(HOME, ".cargo", "bin", "himalaya");
 
 function sh(cmd: string, args: string[], timeoutMs = 30_000): Promise<{ ok: boolean; out: string; err: string }> {
   return new Promise((resolve) => {
@@ -59,15 +62,21 @@ function classify(from: string, subject: string): InboxMsg["kind"] {
   return "other";
 }
 
-async function himalayaConfigured(): Promise<boolean> {
-  const passFile = path.join(HOME, ".config", "himalaya", "REDACTED.pass");
-  return existsSync(path.join(HOME, ".config", "himalaya", "config.toml")) && existsSync(passFile);
+export async function himalayaConfigured(): Promise<boolean> {
+  // OAuth2 tokens live in the macOS keychain, not a pass file — config.toml
+  // having the "optriva" account is the only on-disk signal available.
+  const cfg = path.join(HOME, ".config", "himalaya", "config.toml");
+  if (!existsSync(cfg)) return false;
+  try {
+    const { readFileSync } = await import("node:fs");
+    return readFileSync(cfg, "utf8").includes("[accounts.optriva]");
+  } catch { return false; }
 }
 
 export async function readInbox(max = 15, box: "inbox" | "sent" = "inbox"): Promise<{ source: "himalaya" | "gmail_cli"; messages: InboxMsg[] }> {
-  // Try Himalaya (JSON) when an app password is present (inbox only).
+  // Try Himalaya (JSON) when configured (inbox only).
   if (box === "inbox" && await himalayaConfigured()) {
-    const r = await sh("himalaya", ["envelope", "list", "-a", "REDACTED", "-s", String(max), "-o", "json"], 25_000);
+    const r = await sh(HIMALAYA_BIN, ["envelope", "list", "-a", "optriva", "-s", String(max), "-o", "json"], 25_000);
     if (r.ok) {
       try {
         const arr = JSON.parse(r.out);

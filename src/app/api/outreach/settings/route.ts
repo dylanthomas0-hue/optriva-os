@@ -4,6 +4,7 @@ import path from "node:path";
 import os from "node:os";
 import { readState, writeState, GMAIL_PY } from "@/lib/outreach";
 import { getFirecrawlKey, firecrawlKeySource, getHunterKey, hunterKeySource, getApolloKey, apolloKeySource, maskKey, writeOutreachConfig } from "@/lib/outreachConfig";
+import { himalayaConfigured } from "@/lib/outreachBackends";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,12 +21,12 @@ export async function GET() {
   const akey = await getApolloKey();
   const asource = await apolloKeySource();
   const gmailReady = existsSync(path.join(HOME, ".gmail-mcp", "sa-key.json")) && existsSync(GMAIL_PY);
-  const himalayaReady = existsSync(path.join(HOME, ".config", "himalaya", "REDACTED.pass"));
+  const himalayaReady = await himalayaConfigured();
   return NextResponse.json({
     firecrawl: { configured: Boolean(fkey), masked: maskKey(fkey), source },
     hunter: { configured: Boolean(hkey), masked: maskKey(hkey), source: hsource },
     apollo: { configured: Boolean(akey), masked: maskKey(akey), source: asource },
-    gmail: { ready: gmailReady, mailbox: "hermes@REDACTED.agency" },
+    gmail: { ready: gmailReady, mailbox: "dylan@optriva.co.uk" },
     himalaya: { ready: himalayaReady },
     dailyCap: state.meta.dailyCap,
     paused: Boolean(state.meta.paused),
