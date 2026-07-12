@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { run } from "@/lib/runner";
 import { hermesHome } from "@/lib/config";
+import { routeIntent } from "@/lib/missionRouter";
+import { createMission } from "@/lib/missionStore";
 import { existsSync, readFileSync, appendFile, mkdirSync } from "node:fs";
 import path from "node:path";
 import os from "node:os";
@@ -90,6 +92,45 @@ export async function POST(req: Request) {
   // Optional profile = chat as a specific Hermes employee (seo-writer, etc.).
   if (profile !== undefined && (typeof profile !== "string" || !/^[a-zA-Z0-9_-]{1,64}$/.test(profile))) {
     return NextResponse.json({ error: "bad profile" }, { status: 400 });
+  }
+
+  // ── Execution kernel fast path: task requests never wait for the LLM. ──
+  // The code-based router (no tokens, <1ms) turns clear imperatives into
+  // missions; missiond picks them up within 2s. Everything else falls through
+  // to the normal Hermes chat below. Hermes plans — the kernel executes.
+  const route = routeIntent(prompt);
+  logMetric({ kind: "route", dispatched: !!route, capability: route?.capability ?? null, matched: route?.matched ?? null, promptBytes: prompt.length });
+  if (route) {
+    const cap = route.cap;
+    const mission = await createMission({
+      title: prompt.slice(0, 80),
+      prompt,
+      capability: route.capability,
+      source: "chat",
+      priority: cap.priority,
+      tasks: [{
+        id: "t1",
+        name: route.capability,
+        prompt,
+        executor: cap.executor,
+        verifier: cap.verifier,
+        verify: cap.verify,
+        deps: [],
+        maxAttempts: 2,
+        timeoutMs: cap.timeoutMs ?? 30 * 60 * 1000,
+      }],
+    });
+    return NextResponse.json({
+      ok: true,
+      dispatched: true,
+      missionId: mission.id,
+      text: [
+        `✓ Mission Created — ${route.capability}`,
+        `✓ ${mission.tasks.length} task${mission.tasks.length === 1 ? "" : "s"} queued (${cap.executor.kind})`,
+        `Dispatching… track it in the Missions tab (${mission.id}).`,
+      ].join("\n"),
+      durationMs: Date.now() - t0,
+    });
   }
 
   // hermes -z PROMPT  — single-query non-interactive mode.
