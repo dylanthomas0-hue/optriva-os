@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { run } from "@/lib/runner";
+import { spawnStream } from "@/lib/runner";
 import { hermesHome } from "@/lib/config";
 import { routeIntent } from "@/lib/missionRouter";
 import { createMission } from "@/lib/missionStore";
@@ -154,72 +154,92 @@ export async function POST(req: Request) {
   // he's working on — no file reads needed for basic context.
   const ctx = vaultContext();
   // Hermes keeps trying to hit localhost HTTP APIs for cron/kanban actions and
-  // gets blocked by its own SSRF protection. It already has the terminal tool
-  // (-t all) — steer it to the CLI, which works in oneshot mode.
+  // gets blocked by its own SSRF protection — steer it to the CLI. Task-style
+  // requests are dispatched by the kernel router above, so this block is now
+  // short (prompt bytes cost real model latency: +0.9s per 10KB measured).
   const capabilities = [
-    "--- HOW TO DO THINGS (capabilities) ---",
+    "--- HOW TO DO THINGS ---",
     "ALWAYS reply in English, regardless of what language feels natural.",
-    "Cron jobs: use your terminal tool with the hermes CLI — NEVER call localhost/127.0.0.1 HTTP APIs (SSRF protection blocks them and it will fail).",
-    "  • Run a job now:  hermes cron run <job-id> --accept-hooks",
-    "  • List jobs:      hermes cron list",
-    "After triggering a job, tell the user it's running; output lands in ~/.hermes/cron/output/<job-id>/.",
-    "--- end capabilities ---",
+    "For cron/kanban actions use your terminal tool with the hermes CLI (e.g. `hermes cron run <job-id> --accept-hooks`, `hermes cron list`) — NEVER call localhost HTTP APIs (SSRF protection blocks them).",
+    "Build/automation/research requests are dispatched to the mission queue automatically — if the user asks about ongoing work, point them to the Missions tab.",
+    "--- end ---",
   ].join("\n");
   const fullPrompt = ctx
     ? `--- INSTANT VAULT MEMORY (you know this, don't read any file for it) ---\n${ctx}\n--- end vault memory ---\n\n${capabilities}\n\n${buildPromptWithHistory(history, prompt)}`
     : `${capabilities}\n\n${buildPromptWithHistory(history, prompt)}`;
-  // -t all gives Hermes every tool (cron, kanban, file, web, terminal, browser, etc.)
-  // Without it, oneshot mode loads a limited subset and can't manage crons or kanban.
   const promptBuildMs = Date.now() - t0;
-  const out = await run("hermes", [...profileArgs, "-z", fullPrompt, "-t", "all", "--yolo", "--accept-hooks"], { timeoutMs: TIMEOUT_MS });
-  logMetric({ kind: "chat", promptBuildMs, runMs: out.durationMs,
-    totalMs: Date.now() - t0, promptBytes: fullPrompt.length, exitCode: out.code });
 
-  const text = out.stdout.replace(ANSI_STRIP, "").trim();
-  const stderrClean = out.stderr.replace(ANSI_STRIP, "").trim();
+  // ── Streaming fallthrough ──
+  // Phase-0 benchmarks: hermes -z has a 4–9s floor from agent init (toolset
+  // choice is noise — -t all vs -t todo differ by ~0.4s), so we keep -t all
+  // for capability and fix the FEEL with streaming: an immediate status event,
+  // then output chunks as they arrive, instead of 10–30s of dead air.
+  // PYTHONUNBUFFERED so Python doesn't block-buffer stdout under a pipe.
+  const child = spawnStream("hermes", [...profileArgs, "-z", fullPrompt, "-t", "all", "--yolo", "--accept-hooks"],
+    { extraEnv: { PYTHONUNBUFFERED: "1" } });
 
-  // If Hermes produced no usable text, build a diagnostic reply instead of returning the opaque "(no response)".
-  let diagnostic: string | null = null;
-  if (!text) {
-    const seconds = (out.durationMs / 1000).toFixed(1);
-    const probableTimeout = out.durationMs >= TIMEOUT_MS - 2_000;
-    const lines: string[] = [];
-    lines.push(probableTimeout
-      ? `Hermes timed out after ${seconds}s. Your provider (${process.env.OPENROUTER_API_KEY ? "OpenRouter" : "custom"}) may be slow or unreachable. Try: hermes status`
-      : `Hermes finished in ${seconds}s with exit ${out.code} but no response.`);
-    if (stderrClean) {
-      // Surface the most actionable line first — common errors have known fixes.
-      const known: Record<string, string> = {
-        "No models provided": "Hermes couldn't find a valid model. Check ~/.hermes/config.yaml → model & provider. Run hermes status.",
-        "401": "API key rejected. Run hermes login or check ~/.hermes/.env for your OPENROUTER_API_KEY.",
-        "400": "Bad request — likely a model/provider mismatch. Run hermes status to see what model is configured.",
-        "timeout": "The model took too long to respond. Your provider may be overloaded or the model is too slow for agent use.",
+  const encoder = new TextEncoder();
+  let stdout = "";
+  let stderr = "";
+  const stream = new ReadableStream({
+    start(controller) {
+      let closed = false;
+      const send = (obj: Record<string, unknown>) => {
+        if (closed) return;
+        try { controller.enqueue(encoder.encode(JSON.stringify(obj) + "\n")); } catch { closed = true; }
       };
-      for (const [key, fix] of Object.entries(known)) {
-        if (stderrClean.toLowerCase().includes(key.toLowerCase())) { lines.push(`Fix: ${fix}`); break; }
-      }
-      lines.push("");
-      lines.push("─── stderr ───");
-      lines.push(stderrClean.length > 4000 ? stderrClean.slice(-4000) : stderrClean);
-    } else {
-      lines.push("");
-      lines.push("Blank output with no error is almost always auth or provider config:");
-      lines.push("  1. Run `hermes status` — does your provider show a ✓ next to its API key?");
-      lines.push("  2. If ✗, run `hermes login` (or set the key in ~/.hermes/.env) for that provider.");
-      lines.push("  3. Check the Model + Provider lines in `hermes status` are a real, supported combo.");
-      lines.push("  4. Then `hermes doctor` for a full config check.");
-    }
-    diagnostic = lines.join("\n");
-  }
+      const safeClose = () => { if (!closed) { closed = true; try { controller.close(); } catch {} } };
 
-  return NextResponse.json({
-    ok: out.ok && !!text,
-    text: text || diagnostic || "(no response)",
-    empty: !text,
-    durationMs: out.durationMs,
-    phases: { promptBuildMs, runMs: out.durationMs, totalMs: Date.now() - t0 },
-    exitCode: out.code,
-    timedOut: !text && out.durationMs >= TIMEOUT_MS - 2_000,
-    stderr: stderrClean, // full, no trunc — useful for diagnosing
+      send({ type: "status", text: "Hermes is thinking…" });
+      const killer = setTimeout(() => { try { child.kill("SIGKILL"); } catch {} }, TIMEOUT_MS);
+
+      child.stdout.on("data", (b: Buffer) => {
+        const clean = b.toString().replace(ANSI_STRIP, "");
+        stdout += clean;
+        if (clean) send({ type: "delta", text: clean });
+      });
+      child.stderr.on("data", (b: Buffer) => { stderr += b.toString().replace(ANSI_STRIP, ""); });
+      child.on("close", (code) => {
+        clearTimeout(killer);
+        const totalMs = Date.now() - t0;
+        logMetric({ kind: "chat", promptBuildMs, runMs: totalMs - promptBuildMs, totalMs, promptBytes: fullPrompt.length, exitCode: code });
+        const text = stdout.trim();
+        if (!text) {
+          // Same diagnostics the old JSON path had — common failures get a fix hint.
+          const timedOut = totalMs >= TIMEOUT_MS - 2_000;
+          const lines = [timedOut
+            ? `Hermes timed out after ${(totalMs / 1000).toFixed(1)}s. Your provider may be slow or unreachable. Try: hermes status`
+            : `Hermes finished in ${(totalMs / 1000).toFixed(1)}s with exit ${code} but no response.`];
+          const known: Record<string, string> = {
+            "No models provided": "Hermes couldn't find a valid model. Check ~/.hermes/config.yaml → model & provider. Run hermes status.",
+            "401": "API key rejected. Run hermes login or check ~/.hermes/.env for the provider key.",
+            "400": "Bad request — likely a model/provider mismatch. Run hermes status.",
+            "timeout": "The model took too long. Provider may be overloaded.",
+          };
+          const s = stderr.toLowerCase();
+          for (const [k, fix] of Object.entries(known)) if (s.includes(k.toLowerCase())) { lines.push(`Fix: ${fix}`); break; }
+          if (stderr.trim()) lines.push("", "─── stderr ───", stderr.trim().slice(-2000));
+          else lines.push("", "Blank output with no error is almost always auth/provider config — run `hermes status`, then `hermes doctor`.");
+          send({ type: "result", text: lines.join("\n"), empty: true });
+        }
+        send({ type: "done", code, durationMs: totalMs });
+        safeClose();
+      });
+      child.on("error", (e) => {
+        clearTimeout(killer);
+        send({ type: "result", text: `Hermes failed to start: ${String(e)}`, empty: true });
+        send({ type: "done", code: -1 });
+        safeClose();
+      });
+    },
+    cancel() { try { child.kill("SIGTERM"); } catch {} },
+  });
+
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "application/x-ndjson; charset=utf-8",
+      "Cache-Control": "no-cache, no-transform",
+      "X-Accel-Buffering": "no",
+    },
   });
 }

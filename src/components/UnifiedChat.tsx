@@ -215,14 +215,40 @@ export default function UnifiedChat({
         body: JSON.stringify(hermesProfile ? { prompt, profile: hermesProfile, history } : { prompt, history }),
         signal: ctrl.signal,
       });
-      const j = await r.json();
-      if (j.empty && j.timedOut) {
-        return `Hermes didn't respond in time (${Math.round(j.durationMs/1000)}s timed out). ${j.text || "Check hermes status to see if your provider is reachable."}`;
+      // Two response shapes: JSON = kernel fast-path (mission ack / validation
+      // error), ndjson = streamed chat. Branch on content-type.
+      if ((r.headers.get("content-type") ?? "").includes("application/json")) {
+        const j = await r.json();
+        return j.text ?? j.error ?? "(no response)";
       }
-      if (j.empty) {
-        return j.text || "Hermes returned no output. Run hermes status to check provider config.";
+      if (!r.body) throw new Error("no body");
+      const reader = r.body.getReader();
+      const decoder = new TextDecoder();
+      let acc = "";
+      let fallback = "";
+      let buf = "";
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split("\n");
+        buf = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const evt = JSON.parse(line);
+            if (evt.type === "delta" && typeof evt.text === "string") {
+              acc += evt.text;
+              setPartial(acc);
+            } else if (evt.type === "status" && !acc) {
+              setPartial(evt.text ?? "…");
+            } else if (evt.type === "result" && typeof evt.text === "string") {
+              fallback = evt.text; // diagnostics when hermes produced nothing
+            }
+          } catch { /* skip non-JSON */ }
+        }
       }
-      return j.text ?? "(no response)";
+      return acc.trim() || fallback || "(no response)";
     } catch (e: any) {
       if (e.name === "AbortError") {
         return "Request was cancelled or timed out. Hermes may be starting up — try again in a moment.";
