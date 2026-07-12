@@ -3,6 +3,7 @@
 import { NextResponse } from "next/server";
 import { listMissions, createMission } from "@/lib/missionStore";
 import { loadRegistry } from "@/lib/capabilityRegistry";
+import { planMission } from "@/lib/missionPlanner";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,17 +29,7 @@ export async function POST(req: Request) {
     capability,
     source: typeof source === "string" ? source.slice(0, 64) : "api",
     priority: priority === "high" || priority === "low" ? priority : cap.priority,
-    tasks: [{
-      id: "t1",
-      name: capability,
-      prompt,
-      executor: cap.executor,
-      verifier: cap.verifier,
-      verify: cap.verify,
-      deps: [],
-      maxAttempts: 2,
-      timeoutMs: cap.timeoutMs ?? 30 * 60 * 1000,
-    }],
+    tasks: planMission(capability, cap, prompt),
   });
   return NextResponse.json({ ok: true, mission });
 }

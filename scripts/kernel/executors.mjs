@@ -33,12 +33,14 @@ export const executors = {
     return sh("hermes", ["-z", task.prompt, "-t", task.executor.tools ?? "web", "--yolo", "--accept-hooks"]);
   },
 
-  // Whitelisted script path only — never an arbitrary shell string.
+  // Whitelisted script path only — never an arbitrary shell string. Optional
+  // executor.args are passed as separate argv entries (no shell interpolation).
   shell(task) {
     const script = String(task.executor.script ?? "");
     if (!script.startsWith(`${HOME}/.hermes/scripts/`) && !script.startsWith(`${HOME}/.agentic-os/scripts/`)) {
       throw new Error(`shell executor: script outside whitelist: ${script}`);
     }
-    return sh("/bin/bash", [script]);
+    const args = Array.isArray(task.executor.args) ? task.executor.args.map(String) : [];
+    return sh("/bin/bash", [script, ...args]);
   },
 };

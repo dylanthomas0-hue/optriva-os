@@ -3,6 +3,7 @@ import { spawnStream } from "@/lib/runner";
 import { hermesHome } from "@/lib/config";
 import { routeIntent } from "@/lib/missionRouter";
 import { createMission } from "@/lib/missionStore";
+import { planMission } from "@/lib/missionPlanner";
 import { existsSync, readFileSync, appendFile, mkdirSync } from "node:fs";
 import path from "node:path";
 import os from "node:os";
@@ -108,17 +109,7 @@ export async function POST(req: Request) {
       capability: route.capability,
       source: "chat",
       priority: cap.priority,
-      tasks: [{
-        id: "t1",
-        name: route.capability,
-        prompt,
-        executor: cap.executor,
-        verifier: cap.verifier,
-        verify: cap.verify,
-        deps: [],
-        maxAttempts: 2,
-        timeoutMs: cap.timeoutMs ?? 30 * 60 * 1000,
-      }],
+      tasks: planMission(route.capability, cap, prompt),
     });
     return NextResponse.json({
       ok: true,
@@ -126,7 +117,7 @@ export async function POST(req: Request) {
       missionId: mission.id,
       text: [
         `✓ Mission Created — ${route.capability}`,
-        `✓ ${mission.tasks.length} task${mission.tasks.length === 1 ? "" : "s"} queued (${cap.executor.kind})`,
+        `✓ ${mission.tasks.length} task${mission.tasks.length === 1 ? "" : "s"} planned`,
         `Dispatching… track it in the Missions tab (${mission.id}).`,
       ].join("\n"),
       durationMs: Date.now() - t0,
