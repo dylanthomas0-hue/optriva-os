@@ -28,11 +28,7 @@ const storageKey = (agent: AgentKey, sub?: string) => `agentic-os-chat-v2:${agen
 
 // Accent colors for the Hermes profile pills (mirrors HermesProfiles.tsx).
 function profileAccent(name: string): string {
-  if (name.startsWith("seo-keywords")) return "#fbbf24";
-  if (name.startsWith("seo-outline")) return "#8b5cf6";
-  if (name.startsWith("seo-writer")) return "#5ab896";
-  if (name.startsWith("seo-links")) return "#f472b6";
-  if (name === "REDACTED") return "#d4a574";
+  if (name === "main") return "#d4a574";
   return "#60a5fa";
 }
 

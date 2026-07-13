@@ -20,13 +20,6 @@ const EXAMPLES = [
   "What's the strongest counter-argument to 'the best model wins'? Steel-man it in 4 points.",
 ];
 
-// The MoA builds that went onto REDACTEDBench (panel built them, aggregator merged the best).
-const BENCH_BUILDS = [
-  { slug: "arcade", label: "Neon Breakout", cat: "Game" },
-  { slug: "fireworks", label: "Fireworks", cat: "Visual" },
-  { slug: "galaxy", label: "Particle Galaxy", cat: "Sim" },
-];
-
 function short(m: string) { return m.split("/").pop() || m; }
 
 function ago(ms: number) {
@@ -280,31 +273,6 @@ export default function HermesMoA() {
               )}
             </>
           )}
-        </div>
-
-        {/* REDACTEDBench strip */}
-        <div className="rounded-2xl border p-4 mt-6" style={{ borderColor: "var(--border)", background: "var(--panel)" }}>
-          <div className="flex items-center gap-2 mb-2">
-            <Trophy size={15} style={{ color: GOLD }} />
-            <span className="text-sm font-medium">On REDACTEDBench</span>
-            <span className="text-[11px]" style={{ color: "var(--fg-dimmer)" }}>
-              the panel built these — aggregator merged the best of each
-            </span>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {BENCH_BUILDS.map((b) => (
-              <a key={b.slug} href={`https://REDACTEDbench.com/compare/${b.slug}-moa.html`} target="_blank" rel="noreferrer"
-                className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border hover:opacity-80 transition-opacity"
-                style={{ borderColor: "var(--border)", color: "var(--fg-dim)" }}>
-                <span style={{ color: PLUM }}>{b.cat}</span> {b.label} <ExternalLink size={11} style={{ color: "var(--fg-dimmer)" }} />
-              </a>
-            ))}
-            <a href="https://REDACTEDbench.com" target="_blank" rel="noreferrer"
-              className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border hover:opacity-80 transition-opacity"
-              style={{ borderColor: GOLD, color: GOLD }}>
-              View the leaderboard <ExternalLink size={11} />
-            </a>
-          </div>
         </div>
       </div>
     </div>

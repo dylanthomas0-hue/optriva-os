@@ -36,7 +36,7 @@ export async function orComplete(model: string, messages: Msg[], key: string, op
   if (opts?.noReasoning) body.reasoning = { enabled: false };
   const r = await fetch(OR, {
     method: "POST",
-    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json", "HTTP-Referer": "https://REDACTED.com", "X-Title": "Agent OS · Loop" },
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json", "HTTP-Referer": "https://optriva.co.uk", "X-Title": "Agent OS · Loop" },
     body: JSON.stringify(body), signal: opts?.signal,
   });
   const j = await r.json();
@@ -60,7 +60,7 @@ function nousFrom(file: string): string | null {
   } catch { return null; }
 }
 
-// The Nous Portal token lives in the ACTIVE PROFILE's auth.json (e.g. profiles/REDACTED/auth.json),
+// The Nous Portal token lives in the ACTIVE PROFILE's auth.json (e.g. profiles/main/auth.json),
 // not necessarily the global one — check the profile first, then global, then any profile.
 export function nousToken(): string | null {
   if (process.env.NOUS_API_KEY) return process.env.NOUS_API_KEY.trim();

@@ -5,8 +5,8 @@
 //   3. Auto-detect (via `which`) for CLIs
 //   4. Sensible defaults
 //
-// This is what makes the project portable. REDACTED members run `npm run setup` or
-// drop a config.json with their paths; the dashboard adapts.
+// This is what makes the project portable — drop a config.json with your own
+// paths and the dashboard adapts.
 
 import { readFileSync, existsSync } from "node:fs";
 import { execSync } from "node:child_process";

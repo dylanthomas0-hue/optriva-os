@@ -267,5 +267,3 @@ Inside your Obsidian vault.
 Forever yours.
 
 Go build it.
-
-💛 REDACTED

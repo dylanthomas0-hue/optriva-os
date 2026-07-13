@@ -47,7 +47,7 @@ export async function POST(req: Request) {
   try {
     const r = await fetch(OR_URL, {
       method: "POST",
-      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json", "HTTP-Referer": "https://REDACTED.com", "X-Title": "Agent OS · Outreach writer" },
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json", "HTTP-Referer": "https://optriva.co.uk", "X-Title": "Agent OS · Outreach writer" },
       body: JSON.stringify({ model: MODEL, messages: [{ role: "system", content: sys }, { role: "user", content: `Campaign brief:\n${brief.trim()}` }], max_tokens: 700, temperature: 0.7 }),
     });
     if (!r.ok) { const t = await r.text().catch(() => ""); return Response.json({ error: `Writer HTTP ${r.status}: ${t.slice(0, 160)}` }, { status: 502 }); }

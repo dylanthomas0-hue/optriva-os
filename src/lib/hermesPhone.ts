@@ -8,8 +8,9 @@ import os from "node:os";
 //   Twilio number → ElevenLabs ConvAI agent → public tunnel → Hermes API server.
 // Reads ElevenLabs + API-server keys from the Hermes profile .env (never config.json).
 
-// Read the ACTIVE Hermes profile (e.g. "REDACTED"), not a hardcoded "main" — most
-// installs use a named profile. ~/.hermes/active_profile holds the current one.
+// Read the ACTIVE Hermes profile (e.g. a marketing- or role-specific profile),
+// not a hardcoded name — most installs use a named profile. ~/.hermes/active_profile
+// holds the current one.
 function activeProfile(): string {
   try {
     const p = readFileSync(path.join(hermesHome(), "active_profile"), "utf8").trim();

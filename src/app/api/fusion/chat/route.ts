@@ -57,7 +57,7 @@ export async function POST(req: Request) {
           headers: {
             Authorization: `Bearer ${key}`,
             "Content-Type": "application/json",
-            "HTTP-Referer": "https://REDACTED.com",
+            "HTTP-Referer": "https://optriva.co.uk",
             "X-Title": "Agent OS",
           },
           body: JSON.stringify({ model: MODEL, messages, stream: true }),

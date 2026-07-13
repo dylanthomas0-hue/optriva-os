@@ -180,7 +180,7 @@ export default function AntigravityView() {
                     </button>
                   </div>
                   <div className="text-[10.5px] text-[var(--fg-dimmer)] font-[var(--font-geist-mono)] break-all">
-                    {selected.root.replace("/Users/REDACTED", "~")}
+                    {selected.root.replace("/Users/agent", "~")}
                   </div>
                 </div>
 

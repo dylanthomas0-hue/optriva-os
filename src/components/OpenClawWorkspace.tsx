@@ -35,7 +35,7 @@ function bucketIcon(id: string) {
   const props = { size: 11, style: { color: ACCENT } };
   if (id === "apps")                 return <AppWindow {...props} />;
   if (id === "workspace-main")       return <FolderOpen {...props} />;
-  if (id === "workspace-REDACTED")     return <FolderOpen {...props} />;
+  if (id === "workspace-personal")   return <FolderOpen {...props} />;
   if (id === "workspace-marketing")  return <FolderOpen {...props} />;
   if (id === "skills")               return <Layers {...props} />;
   if (id === "flows")                return <Workflow {...props} />;

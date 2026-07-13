@@ -10,7 +10,7 @@
   "_vault_note": "Full path to your Obsidian vault. Leave null and we'll try ~/Documents/Obsidian Vault, ~/Obsidian, ~/Obsidian Vault.",
 
   "openclawAgent": "main",
-  "_agent_note": "Which openclaw agent to chat with by default (main, REDACTED, marketing, etc.). Run `openclaw agents list` to see yours.",
+  "_agent_note": "Which openclaw agent to chat with by default (main, marketing, etc.). Run `openclaw agents list` to see yours.",
 
   "goalCategories": ["Health", "Personal", "Work", "Learning", "Side Project"],
 

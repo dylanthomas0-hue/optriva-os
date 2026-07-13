@@ -73,7 +73,7 @@ export default function KanbanView() {
   const [board, setBoard] = useState<BoardResponse | null>(null);
   const [boardSlug, setBoardSlug] = useState<string>("default");
 
-  // Deep-link + stickiness: /kanban?board=REDACTED-page opens that board directly,
+  // Deep-link + stickiness: /kanban?board=<slug> opens that board directly,
   // and the last viewed board is remembered across visits.
   useEffect(() => {
     const q = new URLSearchParams(window.location.search).get("board");
@@ -116,7 +116,7 @@ export default function KanbanView() {
 
   // Create-card form state
   const [newTitle, setNewTitle] = useState("");
-  const [newAssignee, setNewAssignee] = useState("REDACTED"); // default to user's active profile
+  const [newAssignee, setNewAssignee] = useState("main"); // default to user's active profile
   const [newBody, setNewBody] = useState("");
   const [newTriage, setNewTriage] = useState(true);
   // Dispatcher result toast
@@ -703,7 +703,7 @@ function TaskDrawer({ taskId, boardSlug, detail, assignees, busy, onClose, onAct
           )}
           {t.workspace_path && (
             <span className="font-[var(--font-geist-mono)] text-[10px] text-[var(--fg-dimmer)] truncate" title={t.workspace_path}>
-              ws: {t.workspace_path.replace(process.env.HOME ?? "/Users/REDACTED", "~")}
+              ws: {t.workspace_path.replace(process.env.HOME ?? "/Users/agent", "~")}
             </span>
           )}
         </div>
@@ -822,7 +822,7 @@ function TaskDrawer({ taskId, boardSlug, detail, assignees, busy, onClose, onAct
           </div>
           {wsRoot && (
             <div className="flex items-center gap-1.5 mb-2 text-[10.5px] font-[var(--font-geist-mono)] text-[var(--fg-dimmer)]">
-              <span className="truncate" title={wsRoot}>{wsRoot.replace("/Users/REDACTED", "~")}</span>
+              <span className="truncate" title={wsRoot}>{wsRoot.replace("/Users/agent", "~")}</span>
               <button
                 onClick={() => navigator.clipboard?.writeText(wsRoot)}
                 className="opacity-60 hover:opacity-100 transition shrink-0"

@@ -3,7 +3,7 @@
 // OpenClaw scatters outputs across:
 //
 //   ~/.openclaw/workspace/                       — main agent scratch
-//   ~/.openclaw/workspace-REDACTED/                — REDACTED agent scratch
+//   ~/.openclaw/workspace-personal/              — personal agent scratch
 //   ~/.openclaw/workspace-marketing/             — marketing agent scratch
 //   ~/.openclaw/skills/                          — installed skills (markdown + assets)
 //   ~/.openclaw/flows/                           — saved flow YAML/JSON
@@ -68,7 +68,7 @@ const BUCKETS: BucketDef[] = [
     // Strict ext filter so we don't pick up identity / config markdown.
     paths: [
       path.join(OPENCLAW_ROOT, "workspace"),
-      path.join(OPENCLAW_ROOT, "workspace-REDACTED"),
+      path.join(OPENCLAW_ROOT, "workspace-personal"),
       path.join(OPENCLAW_ROOT, "workspace-marketing"),
       path.join(OPENCLAW_ROOT, "canvas"),
     ],
@@ -86,7 +86,7 @@ const BUCKETS: BucketDef[] = [
   {
     id: "workspace-personal",
     label: "Personal Workspace",
-    paths: [path.join(OPENCLAW_ROOT, "workspace-personal"), path.join(OPENCLAW_ROOT, "workspace-REDACTED")],
+    paths: [path.join(OPENCLAW_ROOT, "workspace-personal")],
     description: "Scratch dir for your personal agent.",
     maxDepth: 3,
   },

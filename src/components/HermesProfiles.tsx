@@ -28,11 +28,7 @@ function ago(ms: number): string {
 
 // Role colors — the SEO team gets its own palette so it reads as a team.
 function accent(name: string): string {
-  if (name.startsWith("seo-keywords")) return "#fbbf24";
-  if (name.startsWith("seo-outline")) return "#8b5cf6";
-  if (name.startsWith("seo-writer")) return "#5ab896";
-  if (name.startsWith("seo-links")) return "#f472b6";
-  if (name === "REDACTED") return "#d4a574";
+  if (name === "main") return "#d4a574";
   if (name.startsWith("swarm")) return "#475569";
   return ACCENT;
 }

@@ -9,9 +9,9 @@ import { hermesHome } from "@/lib/config";
 //     runs.jsonl        — one line per /moa answer the panel has run
 export function activeProfile(): string {
   try {
-    return fs.readFileSync(path.join(hermesHome(), "active_profile"), "utf8").trim() || "REDACTED";
+    return fs.readFileSync(path.join(hermesHome(), "active_profile"), "utf8").trim() || "main";
   } catch {
-    return "REDACTED";
+    return "main";
   }
 }
 

@@ -48,7 +48,7 @@ async function callModel(key: string, model: string, content: string, maxTokens:
       headers: {
         Authorization: `Bearer ${key}`,
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://REDACTED.com",
+        "HTTP-Referer": "https://optriva.co.uk",
         "X-Title": "Agent OS · MoA",
       },
       body: JSON.stringify({ model, messages: [{ role: "user", content }], max_tokens: maxTokens, temperature: 0.4 }),

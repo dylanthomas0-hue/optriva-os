@@ -13,7 +13,7 @@ export type MediaKind = "image" | "video" | "speech";
 
 const HERMES = path.join(hermesHome());
 
-// Auto-discover all Hermes profile dirs (REDACTED, swarm10, etc.) so we don't hardcode.
+// Auto-discover all Hermes profile dirs (main, marketing, etc.) so we don't hardcode.
 function profileDirs(): string[] {
   const root = path.join(HERMES, "profiles");
   if (!existsSync(root)) return [];
@@ -109,7 +109,7 @@ const ANY_MEDIA_EXT = /\.(png|jpg|jpeg|webp|gif|mp4|webm|mov|mp3|wav|m4a|ogg|aac
 export function isAllowedMediaPath(p: string): boolean {
   const abs = path.resolve(p);
   if (!ANY_MEDIA_EXT.test(abs)) return false;
-  // Must be inside HOME (with separator to prevent /Users/REDACTED-other style escape).
+  // Must be inside HOME (with separator to prevent /Users/agent-other style escape).
   if (abs !== HOME && !abs.startsWith(HOME + path.sep)) return false;
   // Refuse blocked sensitive subdirs.
   for (const blocked of BLOCKED_SUBPATHS) {

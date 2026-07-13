@@ -74,8 +74,7 @@ function cleanText(s: string): string {
 }
 
 // Money/finance content stays OUT of the brief — this is a "what's going on"
-// rundown, not a finance report. NOTE: deliberately does NOT match the brand
-// "REDACTED" / "REDACTED" (a product, not a figure).
+// rundown, not a finance report.
 const MONEY_RE = /[$£€]\s?\d|\b\d[\d,.]*\s*[km]?\s*(?:mrr|arr)\b|\bmrr\b|\barr\b|\brevenue\b|\bturnover\b|\bprofit margin\b|\bcash[\s-]?flow\b|\b\d[\d,.]*\s*(?:usd|gbp|eur|dollars?|pounds?)\b|\b(?:usd|gbp|eur)\b|\bfunds?\b|\bpayments?\b|\bpayouts?\b|\binvoices?\b|\bbilling\b|\bwire transfers?\b/i;
 
 // Remove money fragments from a line (parenthetical money clauses + trailing
@@ -231,8 +230,8 @@ async function synthesize(range: BriefingRange, ctx: string): Promise<{
     "what I've been working on, what's on my mind, the day/week ahead, and notable news. " +
     "Base EVERYTHING strictly on the real data I provide — never invent tasks, projects, or facts.\n" +
     "HARD RULE: do NOT mention money, revenue, MRR, ARR, pricing, sales, financial figures, or " +
-    "targets — omit them entirely, even if they appear in the data. (The brand name " +
-    "\"REDACTED\" / \"REDACTED\" is fine — it's a product, not a figure.)\n" +
+    "targets — omit them entirely, even if they appear in the data. Product/brand names that " +
+    "happen to contain money-flavoured words are fine to mention — they're not a figure.\n" +
     "Return ONLY a JSON object (no markdown, no prose) with exactly these keys:\n" +
     '{"greeting": string, "headline": string, "spoken": string, "themes": string[], "focus": string[]}\n' +
     "- greeting: one short in-character line.\n" +

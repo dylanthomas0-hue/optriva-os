@@ -4,9 +4,9 @@
 // per-project subdirs. It scatters outputs into typed buckets:
 //
 //   ~/.hermes/images/                                 — image generation
-//   ~/.hermes/profiles/REDACTED/audio_cache/            — TTS / voice outputs
-//   ~/.hermes/profiles/REDACTED/pastes/                 — text dumps from sessions
-//   ~/.hermes/profiles/REDACTED/workspace/              — generic agent scratch
+//   ~/.hermes/profiles/<profile>/audio_cache/         — TTS / voice outputs
+//   ~/.hermes/profiles/<profile>/pastes/              — text dumps from sessions
+//   ~/.hermes/profiles/<profile>/workspace/           — generic agent scratch
 //   ~/.hermes/sandboxes/<name>/                       — sandboxed execution
 //
 // We model each of these as a "virtual project" so the same Workspace UI
@@ -23,14 +23,14 @@ const HOME = os.homedir();
 export const HERMES_ROOT = path.join(hermesHome());
 
 // Active profile detection — Hermes writes the current profile name to
-// ~/.hermes/active_profile. Default to "REDACTED" matching the user's setup.
+// ~/.hermes/active_profile. Default to "main" if that file is missing.
 function readActiveProfile(): string {
   try {
     const txt = require("node:fs").readFileSync(path.join(HERMES_ROOT, "active_profile"), "utf8");
     const trimmed = (txt as string).trim();
     if (trimmed && /^[A-Za-z0-9_.-]+$/.test(trimmed)) return trimmed;
   } catch { /* fall through */ }
-  return "REDACTED";
+  return "main";
 }
 export const HERMES_PROFILE = readActiveProfile();
 const PROFILE_ROOT = path.join(HERMES_ROOT, "profiles", HERMES_PROFILE);
