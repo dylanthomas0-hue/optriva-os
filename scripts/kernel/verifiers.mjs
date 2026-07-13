@@ -68,9 +68,13 @@ export const verifiers = {
   // touches the live site.
   "website-redesign"(task, ctx) {
     const evidence = [];
-    const m = (ctx.logTail || "").match(/REDESIGN_ID::(\S+)/);
-    if (!m) return { verdict: "rejected", error: "no REDESIGN_ID found in output — driver did not reach completion", evidence };
-    const id = m[1];
+    // A retried task's log tail can contain more than one REDESIGN_ID (each
+    // attempt makes its own worktree) — take the LAST one, not the first, or
+    // a retry that actually succeeded gets checked against its failed
+    // predecessor's now-stale worktree and wrongly rejected.
+    const matches = [...(ctx.logTail || "").matchAll(/REDESIGN_ID::(\S+)/g)];
+    if (!matches.length) return { verdict: "rejected", error: "no REDESIGN_ID found in output — driver did not reach completion", evidence };
+    const id = matches[matches.length - 1][1];
     const worktree = `/Users/dylanthomas/.agentic-os/site-redesign/${id}`;
     const branch = `redesign/${id}`;
     try {
