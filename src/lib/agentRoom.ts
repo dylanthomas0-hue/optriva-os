@@ -5,6 +5,7 @@
 
 import { readFileSync, existsSync } from "node:fs";
 import { writeFile, mkdir, readFile, readdir, unlink } from "node:fs/promises";
+import http from "node:http";
 import path from "node:path";
 import os from "node:os";
 import { searchNotes, recentNotes, searchOmi, readNote, VAULT_AVAILABLE } from "@/lib/vault";
@@ -253,33 +254,47 @@ const LEAD_STATUSES = new Set(["new", "mockup", "contacted", "won", "lost"]);
 // BUILD:: — fire-and-forget commission of a real GLM Code build via the dashboard's
 // own API. The stream is drained in the background; on completion the outcome (and
 // preview link for an index.html) is saved as a Room Note so the result is findable.
+// Drains the build's ndjson stream via node:http rather than fetch(): undici
+// (fetch's client) kills idle connections after ~5min of no bytes by default,
+// and GLM 5.2 routinely goes quiet that long mid-tool-loop — that timeout was
+// silently killing real, working builds (`TypeError: terminated`, no error
+// surfaced anywhere) well before the server's own 12-minute hard cap ever got
+// a chance to apply. http.request has no such default idle timeout.
+function drainBuildStream(port: string, body: string): Promise<{ ok: boolean; resultLine: string }> {
+  return new Promise((resolve) => {
+    let ok = false; let resultLine = "";
+    let buf = "";
+    const req = http.request(
+      { hostname: "127.0.0.1", port: Number(port), path: "/api/glm-code/build", method: "POST",
+        headers: { "content-type": "application/json", "content-length": Buffer.byteLength(body) } },
+      (res) => {
+        res.setEncoding("utf8");
+        res.on("data", (chunk: string) => {
+          buf += chunk;
+          let nl: number;
+          while ((nl = buf.indexOf("\n")) >= 0) {
+            const line = buf.slice(0, nl); buf = buf.slice(nl + 1);
+            try {
+              const j = JSON.parse(line);
+              if (j.type === "result") { ok = j.subtype === "success"; resultLine = String(j.result ?? "").slice(0, 400); }
+            } catch {}
+          }
+        });
+        res.on("end", () => resolve({ ok, resultLine }));
+        res.on("error", (e) => resolve({ ok: false, resultLine: `build request failed: ${String(e).slice(0, 120)}` }));
+      }
+    );
+    req.on("error", (e) => resolve({ ok: false, resultLine: `build request failed: ${String(e).slice(0, 120)}` }));
+    req.write(body);
+    req.end();
+  });
+}
+
 function startRoomBuild(prompt: string, agentName: string): string {
   const project = `room-${prompt.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 32)}-${Date.now().toString(36).slice(-4)}`;
   const port = process.env.PORT || "3737";
   void (async () => {
-    let ok = false; let resultLine = "";
-    try {
-      const r = await fetch(`http://127.0.0.1:${port}/api/glm-code/build`, {
-        method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ prompt, project }),
-      });
-      const reader = r.body?.getReader();
-      const dec = new TextDecoder();
-      let buf = "";
-      while (reader) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buf += dec.decode(value, { stream: true });
-        let nl;
-        while ((nl = buf.indexOf("\n")) >= 0) {
-          const line = buf.slice(0, nl); buf = buf.slice(nl + 1);
-          try {
-            const j = JSON.parse(line);
-            if (j.type === "result") { ok = j.subtype === "success"; resultLine = String(j.result ?? "").slice(0, 400); }
-          } catch {}
-        }
-      }
-    } catch (e) { resultLine = `build request failed: ${String(e).slice(0, 120)}`; }
+    const { ok, resultLine } = await drainBuildStream(port, JSON.stringify({ prompt, project }));
     const preview = `/api/glm-code/preview/${project}/index.html`;
     await saveRoomNote(
       `Build ${ok ? "finished" : "FAILED"} — ${project}`,
