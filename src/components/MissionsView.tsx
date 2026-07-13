@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Rocket, RefreshCw, X, CheckCircle2, XCircle, Clock, Loader2, PauseCircle,
-  RotateCcw, Archive, FileText, ListTree, History, PlayCircle, ShieldCheck,
+  RotateCcw, Archive, FileText, ListTree, History, PlayCircle, ShieldCheck, Trash2,
 } from "lucide-react";
 
 interface Evidence { type: string; value: string; capturedAt: number; }
@@ -96,6 +96,7 @@ export default function MissionsView() {
   const [replayStep, setReplayStep] = useState(0);
   const [tab, setTab] = useState<"tasks" | "log" | "replay">("tasks");
   const [live, setLive] = useState(false);
+  const [deployState, setDeployState] = useState<{ id: string; busy: boolean; result?: { ok: boolean; log: string } } | null>(null);
   const openIdRef = useRef(openId);
   openIdRef.current = openId;
 
@@ -149,6 +150,19 @@ export default function MissionsView() {
 
   const act = useCallback(async (id: string, action: "retry" | "close") => {
     await fetch(`/api/missions/${id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ action }) });
+    refresh();
+    if (openIdRef.current === id) openDetail(id);
+  }, [refresh, openDetail]);
+
+  // Deploy/discard hit the live site (deploy) or delete a worktree (discard) —
+  // slower and consequential enough to want an explicit busy state + result,
+  // unlike the instant retry/close.
+  const deployOrDiscard = useCallback(async (id: string, action: "deploy" | "discard") => {
+    if (action === "deploy" && !window.confirm("This will merge the redesign branch and deploy it to the LIVE optriva.co.uk site. Continue?")) return;
+    setDeployState({ id, busy: true });
+    const r = await fetch(`/api/missions/${id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ action } ) });
+    const result = await r.json();
+    setDeployState({ id, busy: false, result });
     refresh();
     if (openIdRef.current === id) openDetail(id);
   }, [refresh, openDetail]);
@@ -238,7 +252,25 @@ export default function MissionsView() {
                   <Archive size={12} /> Close
                 </button>
               )}
+              {m.capability === "website-redesign" && m.state === "verified" && (
+                <>
+                  <button onClick={() => deployOrDiscard(m.id, "deploy")} disabled={deployState?.busy && deployState.id === m.id}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] border border-[#4ade8055] text-[#4ade80] hover:bg-[#4ade8014] disabled:opacity-50">
+                    {deployState?.busy && deployState.id === m.id ? <Loader2 size={12} className="animate-spin" /> : <Rocket size={12} />} Approve &amp; Deploy
+                  </button>
+                  <button onClick={() => deployOrDiscard(m.id, "discard")} disabled={deployState?.busy && deployState.id === m.id}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] border border-[#f8717155] text-[#f87171] hover:bg-[#f8717114] disabled:opacity-50">
+                    <Trash2 size={12} /> Discard
+                  </button>
+                </>
+              )}
             </div>
+
+            {deployState && deployState.id === m.id && deployState.result && (
+              <div className={`mb-4 rounded-lg border p-3 text-[11px] font-[var(--font-geist-mono)] whitespace-pre-wrap break-all ${deployState.result.ok ? "border-[#4ade8055] text-[#4ade80]" : "border-[#f8717155] text-[#f87171]"}`}>
+                {deployState.result.ok ? "✓ " : "✗ "}{deployState.result.log.slice(-800) || (deployState.result.ok ? "done" : "failed")}
+              </div>
+            )}
 
             <div className="flex gap-1 mb-3 border-b border-[var(--panel-border)]">
               {([["tasks", "Tasks", ListTree], ["log", "Log", FileText], ["replay", "Replay", History]] as const).map(([key, label, Icon]) => (

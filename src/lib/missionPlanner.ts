@@ -17,11 +17,19 @@ const PLANNERS: Record<string, (prompt: string) => PlannedTask[]> = {
 export function planMission(capability: string, cap: Capability, prompt: string): PlannedTask[] {
   const planner = cap.planner ? PLANNERS[cap.planner] : null;
   if (planner) return planner(prompt);
+  // Shell executors with no planner get the raw chat prompt appended as their
+  // final argv — otherwise a typed brief (e.g. "redesign the website: make the
+  // hero section...") is silently discarded and the script falls back to its
+  // own hardcoded default every time.
+  const existingArgs = Array.isArray(cap.executor.args) ? (cap.executor.args as string[]) : [];
+  const executor = cap.executor.kind === "shell"
+    ? { ...cap.executor, args: [...existingArgs, prompt] }
+    : cap.executor;
   return [{
     id: "t1",
     name: capability,
     prompt,
-    executor: cap.executor,
+    executor,
     verifier: cap.verifier,
     verify: cap.verify,
     deps: [],

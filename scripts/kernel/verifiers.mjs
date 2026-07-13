@@ -59,30 +59,40 @@ export const verifiers = {
   },
 
   // Frontend redesign: real work + a working build, not an executor's word.
-  // "verified" requires BOTH: git HEAD moved since the driver's before-snapshot
-  // (something actually changed, not a no-op run) AND the rebuild produced a
-  // non-trivial bundle (a broken build after "improvements" is a rejection).
+  // Runs entirely in an isolated git worktree/branch (never the main working
+  // tree) — "verified" requires BOTH: the worktree's HEAD moved since its own
+  // before-snapshot (something actually changed, not a no-op run) AND the
+  // rebuild produced a non-trivial bundle (a broken build after "improvements"
+  // is a rejection). Evidence carries the branch/worktree so the dashboard can
+  // offer a real preview + an explicit Approve & Deploy action — nothing here
+  // touches the live site.
   "website-redesign"(task, ctx) {
-    const repo = "/Users/dylanthomas/optriva-website";
     const evidence = [];
+    const m = (ctx.logTail || "").match(/REDESIGN_ID::(\S+)/);
+    if (!m) return { verdict: "rejected", error: "no REDESIGN_ID found in output — driver did not reach completion", evidence };
+    const id = m[1];
+    const worktree = `/Users/dylanthomas/.agentic-os/site-redesign/${id}`;
+    const branch = `redesign/${id}`;
     try {
-      const before = readFileSync(`${repo}/.redesign-before-head`, "utf8").trim();
-      const after = runCheck(`cd ${repo} && git rev-parse HEAD`).trim();
+      const before = readFileSync(`${worktree}/.redesign-before-head`, "utf8").trim();
+      const after = runCheck(`cd ${worktree} && git rev-parse HEAD`).trim();
       if (before === after) {
-        return { verdict: "rejected", error: "git HEAD unchanged — no commit was made, no real work done", evidence };
+        return { verdict: "rejected", error: "git HEAD unchanged in worktree — no commit was made, no real work done", evidence };
       }
-      evidence.push({ type: "commit", value: `${before.slice(0, 7)} → ${after.slice(0, 7)}`, capturedAt: Date.now() });
+      evidence.push({ type: "commit", value: `${branch} — ${before.slice(0, 7)} → ${after.slice(0, 7)}`, capturedAt: Date.now() });
+      evidence.push({ type: "file", value: `worktree: ${worktree}`, capturedAt: Date.now() });
 
-      const bundleStat = statSync(`${repo}/frontend/build/static/js`, { throwIfNoEntry: false });
-      const idx = statSync(`${repo}/frontend/build/index.html`, { throwIfNoEntry: false });
+      const bundleStat = statSync(`${worktree}/frontend/build/static/js`, { throwIfNoEntry: false });
+      const idx = statSync(`${worktree}/frontend/build/index.html`, { throwIfNoEntry: false });
       if (!idx || !bundleStat) {
         return { verdict: "rejected", error: "frontend/build missing or incomplete after rebuild — build likely failed", evidence };
       }
-      const rebuildLog = readFileSync(`${repo}/build/redesign-rebuild.log`, "utf8");
+      const rebuildLog = readFileSync(`${worktree}/redesign-rebuild.log`, "utf8");
       if (/Failed to compile|error TS|SyntaxError/i.test(rebuildLog)) {
         return { verdict: "rejected", error: "rebuild log shows compile errors", evidence: [...evidence, { type: "log", value: rebuildLog.slice(-1000), capturedAt: Date.now() }] };
       }
-      evidence.push({ type: "log", value: "frontend rebuilt successfully — NOT deployed to production; review then deploy manually", capturedAt: Date.now() });
+      evidence.push({ type: "url", value: `/api/missions/${ctx.missionId ?? ""}/preview/index.html`, capturedAt: Date.now() });
+      evidence.push({ type: "log", value: "frontend rebuilt successfully in isolated worktree — NOT deployed; review the preview, then Approve & Deploy from the Missions tab", capturedAt: Date.now() });
       return { verdict: "verified", evidence };
     } catch (e) {
       return { verdict: "rejected", error: String(e.message).slice(-400), evidence };

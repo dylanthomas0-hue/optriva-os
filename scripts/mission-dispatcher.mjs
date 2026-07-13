@@ -122,7 +122,7 @@ function finishTask(missionId, taskId, { exitCode, error }) {
   let result;
   try {
     const verifier = verifiers[task.verifier] ?? verifiers.command;
-    result = error ? { verdict: "rejected", error } : verifier(task, { exitCode, logTail });
+    result = error ? { verdict: "rejected", error } : verifier(task, { exitCode, logTail, missionId });
   } catch (e) {
     result = { verdict: "rejected", error: `verifier crashed: ${String(e.message)}` };
   }
