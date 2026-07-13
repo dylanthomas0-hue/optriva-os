@@ -90,12 +90,14 @@ const DEFAULT_REGISTRY: Registry = {
       priority: "normal",
       timeoutMs: 2 * 60 * 1000,
     },
-    // Disabled 2026-07-13: a real test (research task via `openclaw agent`)
-    // hung for 5+ minutes at 0% CPU with zero output — no evidence anywhere of
-    // OpenClaw completing a real mission (its session logs are all smoke
-    // tests). Feature-flagged off until it's proven with repeated successful
-    // runs; routeIntent skips disabled capabilities entirely, so prompts that
-    // would've matched this just fall through to normal chat instead.
+    // Re-enabled 2026-07-13: the original hang was a dead loop calling a
+    // nonexistent tool, itself downstream of `web_search` being unconfigured
+    // (no provider set). Fixed at the OpenClaw config layer (enabled the
+    // duckduckgo plugin + set tools.web.search.enabled/provider) and verified
+    // with 3 consecutive clean end-to-end runs (~7min each, real results, no
+    // loops, no dead tool calls) — see Fixes Log 2026-07-13. timeoutMs stays
+    // as the circuit breaker: missiond kills any task exceeding it regardless
+    // of cause, so a future regression can't hang indefinitely again.
     automation: {
       match: ["automate", "automation", "monitor", "schedule a", "set up a job"],
       planner: null,
@@ -104,7 +106,6 @@ const DEFAULT_REGISTRY: Registry = {
       schedulerPool: "openclaw",
       priority: "normal",
       timeoutMs: 15 * 60 * 1000,
-      enabled: false,
     },
     research: {
       match: ["research", "look up", "look into", "find out", "compare prices", "market research"],
