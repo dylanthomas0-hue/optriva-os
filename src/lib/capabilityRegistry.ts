@@ -64,8 +64,21 @@ const DEFAULT_REGISTRY: Registry = {
       priority: "normal",
       timeoutMs: 3 * 60 * 60 * 1000,
     },
+    // Checked before "automation" — searches n8n.io's real template library
+    // (nodes/connections a model would otherwise hallucinate) and imports the
+    // best free match into the local n8n instance, inactive for review.
+    "n8n-workflow": {
+      match: ["n8n", "build a workflow", "build me a workflow", "create a workflow", "make a workflow",
+        "n8n workflow", "n8n automation"],
+      planner: null,
+      verifier: "n8n",
+      executor: { kind: "n8n" },
+      schedulerPool: "shell",
+      priority: "normal",
+      timeoutMs: 3 * 60 * 1000,
+    },
     automation: {
-      match: ["automate", "automation", "workflow", "monitor", "scrape", "schedule a", "set up a job"],
+      match: ["automate", "automation", "monitor", "scrape", "schedule a", "set up a job"],
       planner: null,
       verifier: "log",
       executor: { kind: "openclaw", agent: "main" },

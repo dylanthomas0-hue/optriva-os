@@ -88,4 +88,40 @@ export const verifiers = {
       return { verdict: "rejected", error: String(e.message).slice(-400), evidence };
     }
   },
+
+  // n8n import: the executor's own stdout claiming success is worthless on
+  // its own — this does a live GET back from n8n's API to confirm the
+  // workflow actually exists with real, non-empty nodes (not an empty shell
+  // that "created" successfully but imported nothing).
+  n8n(task, { exitCode, logTail }) {
+    const evidence = [];
+    if (exitCode !== 0) return { verdict: "rejected", error: `importer exit ${exitCode}: ${String(logTail).slice(-400)}`, evidence };
+    let record;
+    try {
+      record = JSON.parse(readFileSync(`${HOME}/.agentic-os/n8n/last-import.json`, "utf8"));
+    } catch (e) {
+      return { verdict: "rejected", error: `no last-import.json record: ${e.message}`, evidence };
+    }
+    evidence.push({ type: "log", value: `template #${record.templateId} "${record.templateName}" -> workflow ${record.workflowId}`, capturedAt: Date.now() });
+
+    let cfg;
+    try {
+      cfg = JSON.parse(readFileSync(`${HOME}/.agentic-os/n8n/config.json`, "utf8"));
+    } catch (e) {
+      return { verdict: "rejected", error: `no n8n config: ${e.message}`, evidence };
+    }
+    try {
+      const out = runCheck(`curl -sf "${cfg.baseUrl}/api/v1/workflows/${record.workflowId}" -H "X-N8N-API-KEY: ${cfg.apiKey}"`);
+      const live = JSON.parse(out);
+      const nodeCount = (live.nodes || []).length;
+      if (nodeCount === 0) return { verdict: "rejected", error: "workflow exists but has zero nodes", evidence };
+      if (nodeCount !== record.nodeCount) {
+        evidence.push({ type: "log", value: `node count mismatch: importer said ${record.nodeCount}, live shows ${nodeCount} — using live as truth`, capturedAt: Date.now() });
+      }
+      evidence.push({ type: "url", value: `${cfg.baseUrl}/workflow/${record.workflowId}`, capturedAt: Date.now() });
+      return { verdict: "verified", evidence };
+    } catch (e) {
+      return { verdict: "rejected", error: `live GET failed — workflow may not actually exist: ${String(e.message).slice(-300)}`, evidence };
+    }
+  },
 };
