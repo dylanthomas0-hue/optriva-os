@@ -49,17 +49,32 @@ async function main() {
   const wf = detailJson.workflow?.workflow;
   if (!wf?.nodes?.length) throw new Error(`template ${chosen.id} has no importable workflow body`);
 
-  // Adapt credentials: map known types onto real local credentials, drop the
-  // rest (the workflow still imports — those nodes just show "select
-  // credential" in the UI instead of pointing at a dead reference).
+  // n8n.io's template export adds marketplace-only fields (cid, creator, and
+  // sometimes others) that aren't part of n8n's actual node schema — its
+  // create-workflow API validates strictly and rejects "additional
+  // properties", so only real node fields survive the round-trip.
+  const NODE_FIELDS = new Set([
+    "id", "name", "type", "typeVersion", "position", "parameters", "credentials",
+    "disabled", "notes", "notesInFlow", "continueOnFail", "retryOnFail", "maxTries",
+    "waitBetweenTries", "alwaysOutputData", "executeOnce", "onError", "webhookId",
+  ]);
   const credMap = cfg.credentialMap || {};
   const nodes = wf.nodes.map((n) => {
-    if (!n.credentials) return n;
-    const mapped = {};
-    for (const credType of Object.keys(n.credentials)) {
-      if (credMap[credType]) mapped[credType] = credMap[credType];
+    const clean = {};
+    for (const key of Object.keys(n)) {
+      if (NODE_FIELDS.has(key)) clean[key] = n[key];
     }
-    return { ...n, credentials: mapped };
+    // Adapt credentials: map known types onto real local credentials, drop the
+    // rest (the workflow still imports — those nodes just show "select
+    // credential" in the UI instead of pointing at a dead reference).
+    if (clean.credentials) {
+      const mapped = {};
+      for (const credType of Object.keys(clean.credentials)) {
+        if (credMap[credType]) mapped[credType] = credMap[credType];
+      }
+      clean.credentials = mapped;
+    }
+    return clean;
   });
 
   const body = {
