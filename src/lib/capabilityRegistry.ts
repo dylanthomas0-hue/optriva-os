@@ -17,6 +17,7 @@ export interface Capability {
   schedulerPool: string;
   priority: "high" | "normal" | "low";
   timeoutMs?: number;
+  enabled?: boolean;                                 // false = feature-flagged off; routeIntent skips it entirely
 }
 
 export interface Registry {
@@ -89,6 +90,12 @@ const DEFAULT_REGISTRY: Registry = {
       priority: "normal",
       timeoutMs: 2 * 60 * 1000,
     },
+    // Disabled 2026-07-13: a real test (research task via `openclaw agent`)
+    // hung for 5+ minutes at 0% CPU with zero output — no evidence anywhere of
+    // OpenClaw completing a real mission (its session logs are all smoke
+    // tests). Feature-flagged off until it's proven with repeated successful
+    // runs; routeIntent skips disabled capabilities entirely, so prompts that
+    // would've matched this just fall through to normal chat instead.
     automation: {
       match: ["automate", "automation", "monitor", "schedule a", "set up a job"],
       planner: null,
@@ -97,6 +104,7 @@ const DEFAULT_REGISTRY: Registry = {
       schedulerPool: "openclaw",
       priority: "normal",
       timeoutMs: 15 * 60 * 1000,
+      enabled: false,
     },
     research: {
       match: ["research", "look up", "look into", "find out", "compare prices", "market research"],

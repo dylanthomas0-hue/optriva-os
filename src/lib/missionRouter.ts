@@ -18,18 +18,41 @@ const IMPERATIVE = /^(?:please\s+|can you\s+|could you\s+)?(build|create|make|de
 // Hard conversational guards — any of these means "talk, don't dispatch".
 const QUESTION = /^(what|why|how|when|where|who|which|is|are|was|were|am|do|does|did|can|could|should|would|will|has|have|tell me|explain)\b/i;
 
+// A capability keyword mentioned deep in a prompt (e.g. "...might need a
+// better website" inside a research request) is a much weaker signal than one
+// appearing right after the imperative verb — pure substring matching treated
+// those the same and let incidental nouns hijack unrelated requests (found via
+// "research local businesses...that might need a better website" dispatching
+// the whole website-build pipeline instead of research). Score every
+// capability's best match by proximity to the verb instead of stopping at the
+// first hit in registry order, and require a minimum confidence before
+// dispatching — below it, fall through to normal conversational chat.
+const PROXIMITY_WINDOW = 30;   // chars after the verb where a match still counts as the verb's object
+const CONFIDENCE_THRESHOLD = 0.3;
+
 export function routeIntent(prompt: string): Route | null {
   const p = prompt.trim();
   if (p.length < 8 || p.length > 2000) return null;
   if (QUESTION.test(p) || p.endsWith("?")) return null;
-  if (!IMPERATIVE.test(p)) return null;
+  const verbMatch = p.match(IMPERATIVE);
+  if (!verbMatch) return null;
+  const verbEnd = verbMatch[0].length;
 
   const lower = p.toLowerCase();
   const { capabilities } = loadRegistry();
+  let best: (Route & { score: number }) | null = null;
   for (const [name, cap] of Object.entries(capabilities)) {
+    if (cap.enabled === false) continue; // feature-flagged off — not proven reliable yet
     for (const kw of cap.match) {
-      if (lower.includes(kw.toLowerCase())) return { capability: name, cap, matched: kw };
+      const idx = lower.indexOf(kw.toLowerCase());
+      if (idx === -1) continue;
+      const distance = Math.max(0, idx - verbEnd);
+      const proximityScore = Math.max(0, 1 - distance / PROXIMITY_WINDOW);
+      const specificityScore = Math.min(kw.length / 20, 1); // longer/more-specific keywords are stronger signals
+      const score = proximityScore * 0.7 + specificityScore * 0.3;
+      if (!best || score > best.score) best = { capability: name, cap, matched: kw, score };
     }
   }
-  return null;
+  if (!best || best.score < CONFIDENCE_THRESHOLD) return null;
+  return { capability: best.capability, cap: best.cap, matched: best.matched };
 }
