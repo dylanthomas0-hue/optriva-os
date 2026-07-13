@@ -124,4 +124,27 @@ export const verifiers = {
       return { verdict: "rejected", error: `live GET failed — workflow may not actually exist: ${String(e.message).slice(-300)}`, evidence };
     }
   },
+
+  // Scrapling scrape: the script's own exit code just means "didn't crash" —
+  // this parses its final JSON line out of the log and requires real,
+  // substantive extracted text, not an empty/blocked page that "succeeded".
+  "web-scrape"(task, { exitCode, logTail }) {
+    const evidence = [];
+    if (exitCode !== 0) return { verdict: "rejected", error: `scraper exit ${exitCode}: ${String(logTail).slice(-400)}`, evidence };
+    const lines = String(logTail).trim().split("\n");
+    let record;
+    for (let i = lines.length - 1; i >= 0; i--) {
+      const line = lines[i].trim();
+      if (line.startsWith("{") && line.endsWith("}")) {
+        try { record = JSON.parse(line); break; } catch { /* keep scanning backwards */ }
+      }
+    }
+    if (!record) return { verdict: "rejected", error: "no JSON result line found in scraper output", evidence };
+    evidence.push({ type: "url", value: record.url, capturedAt: Date.now() });
+    evidence.push({ type: "log", value: `fetcher=${record.fetcherUsed} status=${record.statusCode} title="${record.title}" textLength=${record.textLength}`, capturedAt: Date.now() });
+    if (!record.textLength || record.textLength < 50) {
+      return { verdict: "rejected", error: `only ${record.textLength || 0} chars extracted — likely blocked or empty page`, evidence };
+    }
+    return { verdict: "verified", evidence };
+  },
 };

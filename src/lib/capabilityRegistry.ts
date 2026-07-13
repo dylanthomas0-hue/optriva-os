@@ -77,8 +77,20 @@ const DEFAULT_REGISTRY: Registry = {
       priority: "normal",
       timeoutMs: 3 * 60 * 1000,
     },
+    // Checked before "automation" — free, self-hosted (Scrapling), tries
+    // plain HTTP first and only escalates to a real stealth browser if the
+    // page looks blocked/empty, so most scrapes never pay for a browser.
+    "web-scrape": {
+      match: ["scrape", "scrape this", "scrape the", "scrape a website", "extract data from"],
+      planner: null,
+      verifier: "web-scrape",
+      executor: { kind: "scrapling" },
+      schedulerPool: "shell",
+      priority: "normal",
+      timeoutMs: 2 * 60 * 1000,
+    },
     automation: {
-      match: ["automate", "automation", "monitor", "scrape", "schedule a", "set up a job"],
+      match: ["automate", "automation", "monitor", "schedule a", "set up a job"],
       planner: null,
       verifier: "log",
       executor: { kind: "openclaw", agent: "main" },

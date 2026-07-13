@@ -53,4 +53,12 @@ export const executors = {
     const script = path.join(HOME, "agent-os", "source", "scripts", "kernel", "n8n-import.mjs");
     return sh("node", [script, task.prompt]);
   },
+
+  // Scrapling-based scraper (free, self-hosted — see scrapling-fetch.py for
+  // the plain-HTTP-first-escalate-to-stealth-browser runtime strategy). The
+  // script's own venv shebang means this doesn't need PATH resolution.
+  scrapling(task) {
+    const script = path.join(HOME, ".hermes", "scripts", "scrapling-fetch.py");
+    return sh(script, [task.prompt]);
+  },
 };
