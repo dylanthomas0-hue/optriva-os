@@ -134,10 +134,12 @@ export const verifiers = {
     const lines = String(logTail).trim().split("\n");
     let record;
     for (let i = lines.length - 1; i >= 0; i--) {
+      // Log lines are prefixed by the dispatcher (e.g. "[t1] {...}"), so find
+      // the JSON payload within the line rather than requiring it to start there.
       const line = lines[i].trim();
-      if (line.startsWith("{") && line.endsWith("}")) {
-        try { record = JSON.parse(line); break; } catch { /* keep scanning backwards */ }
-      }
+      const start = line.indexOf("{");
+      if (start === -1 || !line.endsWith("}")) continue;
+      try { record = JSON.parse(line.slice(start)); break; } catch { /* keep scanning backwards */ }
     }
     if (!record) return { verdict: "rejected", error: "no JSON result line found in scraper output", evidence };
     evidence.push({ type: "url", value: record.url, capturedAt: Date.now() });
