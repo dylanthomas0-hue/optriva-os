@@ -16,6 +16,54 @@ So the architecture is built backwards from that failure mode: **assume every ag
 
 ---
 
+## System overview
+
+A higher-level view of how a request moves through the system, before the routing/verification detail below:
+
+```
+                                    User
+                                     │
+                                     ▼
+                            ┌─────────────────┐
+                            │     Hermes      │   Reasoning & routing engine —
+                            │  (intent router) │   matches the request against
+                            └────────┬────────┘   the capability registry
+                                     │
+                                     ▼
+                            ┌─────────────────┐
+                            │    OpenClaw     │   General-purpose autonomous
+                            │    (gateway)    │   agent gateway
+                            └────────┬────────┘
+                                     │
+                                     ▼
+                            ┌─────────────────┐
+                            │    Paperclip    │   Coordinates multiple agents
+                            │  (coordinator)  │   working toward one objective
+                            └────────┬────────┘
+                                     │
+        ┌──────────┬──────────┬─────┴─────┬──────────┬──────────────────┐
+        ▼          ▼          ▼           ▼          ▼                  ▼
+   Developer     Sales    Marketing   Research    Website        Finance / CS
+        │          │          │           │          │                  │
+        └──────────┴──────────┴─────┬─────┴──────────┴──────────────────┘
+                                     │
+                                     ▼
+                       ┌───────────────────────────┐
+                       │      Model routing         │  OpenRouter · Azure OpenAI
+                       │  (reasoning / cost / load)  │  Claude · GLM 5.2 · Ollama
+                       └──────────────┬──────────────┘
+                                     │
+                                     ▼
+                       ┌───────────────────────────┐
+                       │      Obsidian Memory       │  Persistent organisational
+                       │     (knowledge graph)      │  knowledge shared across
+                       └───────────────────────────┘  every specialist agent
+```
+
+Hermes decides *what* needs doing and routes it; OpenClaw and Paperclip handle *how* it gets done, dispatching to specialist workers across the business functions Optriva automates; every worker draws on shared, persistent memory rather than starting from zero each time.
+
+---
+
 ## Feature tour
 
 The kernel below is what makes everything in this section trustworthy, but the dashboard itself covers a lot of ground. A quick tour of what's actually in it:
