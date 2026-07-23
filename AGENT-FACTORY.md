@@ -1,6 +1,6 @@
-# The Agent Factory — speak it, your agent builds it (for $0)
+# The Agent Factory — speak it, your agent builds it 
 
-The **Agent Factory** lives in the **Free Claude Code** tab. You say (or type) an
+The Agent Factory lives in the FCC tab. You say (or type) an
 idea — *"build me a snake game"* — and a model running **on your own Mac** writes
 the whole thing in ~15 seconds, then runs it live in the preview on the right.
 No cloud. No API bill. Fully private.
